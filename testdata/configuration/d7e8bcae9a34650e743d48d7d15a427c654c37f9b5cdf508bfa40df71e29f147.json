@@ -1,0 +1,60 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter ospf UNDERLAY\n  inherit peer BASE\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {
+          "UNDERLAY": {
+            "vrfs": {},
+            "neighbors": {},
+            "templates": {},
+            "address_families": {},
+            "redistribute": []
+          }
+        },
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "f171c9b5df16661084a86d479fa64fdd7b3ffcaa42bece10a122e93bab7733bf",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

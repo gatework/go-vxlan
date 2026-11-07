@@ -1,0 +1,57 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvlan 110\n  vn-segment 10110\ninterface Vlan110\n  vrf member BLUE\n  ip address 10.0.0.1/24\n  ip address 10.0.1.1/24 secondary\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan110": {
+            "addresses": [
+              "10.0.0.1/24",
+              "10.0.1.1/24"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "vrf": "BLUE"
+          }
+        },
+        "vlan_vnis": {
+          "110": 10110
+        },
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "c835be4f61bcb781966e647d4dfb98f490ec505f3687388ed8748cf8bf2e92f0",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_svi",
+        "interface": "Vlan110"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

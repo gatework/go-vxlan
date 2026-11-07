@@ -1,0 +1,53 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter ospf UNDERLAY\n  neighbor 192.0.2.1\n    remote-as 65000\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {
+          "UNDERLAY": {
+            "vrfs": {},
+            "neighbors": {},
+            "templates": {},
+            "address_families": {},
+            "redistribute": []
+          }
+        },
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "370fd3a15c6ad1ccef1c87c1a50dc0ab8d9711fffa2b21188c49705c8bdc1a41",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

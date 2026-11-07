@@ -1,0 +1,68 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvrf context BLUE\n  address-family ipv4 unicast\n    route-target both auto evpn\n    export vrf default 100000 map EXPORT_GLOBAL allow-vpn\n  address-family ipv6 unicast\n    export vrf default map EXPORT_V6\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [
+              {
+                "direction": "both",
+                "target": "auto",
+                "evpn": true,
+                "address_family": "ipv4 unicast"
+              }
+            ],
+            "routes": [],
+            "exports": [
+              {
+                "vrf": "default",
+                "prefix_limit": 100000,
+                "route_map": "EXPORT_GLOBAL",
+                "allow_vpn": true,
+                "address_family": "ipv4 unicast"
+              },
+              {
+                "vrf": "default",
+                "prefix_limit": null,
+                "route_map": "EXPORT_V6",
+                "allow_vpn": false,
+                "address_family": "ipv6 unicast"
+              }
+            ]
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "10155d043e224e08b0caf2bc6246c296cccf25aaf63fcbae2f850a5178c7838e",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

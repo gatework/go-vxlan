@@ -1,0 +1,340 @@
+{
+  "name": "configuration",
+  "text": "hostname LEF-LAB-01\nfeature bgp\nfeature ospf\nfeature vpc\nfeature interface-vlan\nfeature vn-segment-vlan-based\nfeature nv overlay\nnv overlay evpn\nvpc domain 7\n  peer-switch\n  peer-gateway\n  layer3 peer-router\n  peer-keepalive destination 192.0.2.12 source 192.0.2.11 vrf management\n  virtual peer-link destination 192.0.2.22 source 192.0.2.21\ninterface port-channel1\n  vpc peer-link\ninterface port-channel10\n  vpc 10\ninterface Ethernet1/1\n  ip address 10.0.0.1/31\n  ip router ospf UNDERLAY area 0.0.0.0\ninterface Ethernet1/2\n  vrf member BLUE\n  ip address 10.0.0.5/31\n  ip router ospf UNDERLAY area 0.0.0.1\ninterface Loopback0\n  ip address 192.0.2.11/32\n  ip router ospf UNDERLAY area 0.0.0.0\ninterface Loopback1\n  ip address 192.0.2.21/32\nrouter ospf UNDERLAY\n  router-id 192.0.2.11\n  vrf BLUE\n    router-id 192.0.2.111\nvlan 110\n  vn-segment 10110\nvlan 120\n  vn-segment 10120\nvlan 500\n  vn-segment 50000\nvrf context production\n  vni 50000\n  rd 65000:50000\n  address-family ipv4 unicast\n    route-target both auto evpn\nvrf context green\n  vni 60000\n  rd auto\n  address-family ipv4 unicast\n    route-target import 65000:60000\ninterface Vlan110\n  vrf member production\n  ip address 10.110.0.1/24\n  fabric forwarding mode anycast-gateway\ninterface nve1\n  host-reachability protocol bgp\n  source-interface Loopback1\n  member vni 10110\n    ingress-replication protocol bgp\n    suppress-arp\n  member vni 10120\n    mcast-group 239.1.1.20\n    no suppress-arp\n  member vni 10200\n    ingress-replication protocol bgp\n  member vni 50000 associate-vrf\nevpn\n  vni 10110 l2\n    rd auto\n    route-target both auto\n  vni 10300 l2\n    rd 65000:10300\n    route-target both 65000:10300\nrouter bgp 65000\n  router-id 192.0.2.11\n  template peer SPINES\n    remote-as 65000\n    update-source Loopback0\n    bfd\n    address-family l2vpn evpn\n      send-community extended\n  neighbor 192.0.2.1\n    inherit peer SPINES\n  neighbor 192.0.2.0/24\n    inherit peer SPINES\n    no bfd\n    address-family l2vpn evpn\n      route-reflector-client\n  neighbor 192.0.2.9\n    remote-as external\n    address-family ipv4 unicast\n  vrf BLUE\n    neighbor 192.0.2.1\n      inherit peer SPINES\n      no bfd\n      address-family l2vpn evpn\n        no route-reflector-client\nend\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEF-LAB-01",
+        "features": [
+          "bgp",
+          "interface-vlan",
+          "nv overlay",
+          "ospf",
+          "vn-segment-vlan-based",
+          "vpc"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "port-channel1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "peer_link": true
+          },
+          "port-channel10": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "vpc_id": 10
+          },
+          "Ethernet1/1": {
+            "addresses": [
+              "10.0.0.1/31"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "ospf": "UNDERLAY area 0.0.0.0"
+          },
+          "Ethernet1/2": {
+            "addresses": [
+              "10.0.0.5/31"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "vrf": "BLUE",
+            "ospf": "UNDERLAY area 0.0.0.1"
+          },
+          "Loopback0": {
+            "addresses": [
+              "192.0.2.11/32"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "ospf": "UNDERLAY area 0.0.0.0"
+          },
+          "Loopback1": {
+            "addresses": [
+              "192.0.2.21/32"
+            ],
+            "acl_bindings": {},
+            "anycast": false
+          },
+          "Vlan110": {
+            "addresses": [
+              "10.110.0.1/24"
+            ],
+            "acl_bindings": {},
+            "anycast": true,
+            "vrf": "production"
+          }
+        },
+        "vlan_vnis": {
+          "110": 10110,
+          "120": 10120,
+          "500": 50000
+        },
+        "vrfs": {
+          "production": {
+            "route_targets": [
+              {
+                "direction": "both",
+                "target": "auto",
+                "evpn": true,
+                "address_family": "ipv4 unicast"
+              }
+            ],
+            "routes": [],
+            "vni": 50000,
+            "rd": "65000:50000"
+          },
+          "green": {
+            "route_targets": [
+              {
+                "direction": "import",
+                "target": "65000:60000",
+                "evpn": false,
+                "address_family": "ipv4 unicast"
+              }
+            ],
+            "routes": [],
+            "vni": 60000,
+            "rd": "auto"
+          }
+        },
+        "nve": {
+          "members": {
+            "10110": {
+              "associate_vrf": false,
+              "replication": "bgp",
+              "suppress_arp": true
+            },
+            "10120": {
+              "associate_vrf": false,
+              "multicast_group": "239.1.1.20",
+              "suppress_arp": false
+            },
+            "10200": {
+              "associate_vrf": false,
+              "replication": "bgp"
+            },
+            "50000": {
+              "associate_vrf": true
+            }
+          },
+          "host_reachability": "bgp",
+          "source_interface": "Loopback1",
+          "interface": "nve1"
+        },
+        "evpn": {
+          "10110": {
+            "route_targets": [
+              {
+                "direction": "both",
+                "target": "auto",
+                "evpn": false
+              }
+            ],
+            "routes": [],
+            "rd": "auto",
+            "type": "l2"
+          },
+          "10300": {
+            "route_targets": [
+              {
+                "direction": "both",
+                "target": "65000:10300",
+                "evpn": false
+              }
+            ],
+            "routes": [],
+            "rd": "65000:10300",
+            "type": "l2"
+          }
+        },
+        "bgp": {
+          "vrfs": {
+            "BLUE": {
+              "vrfs": {},
+              "neighbors": {
+                "192.0.2.1": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {
+                    "l2vpn evpn": {
+                      "vrfs": {},
+                      "neighbors": {},
+                      "templates": {},
+                      "address_families": {},
+                      "redistribute": [],
+                      "route_reflector_client": false
+                    }
+                  },
+                  "redistribute": [],
+                  "inherit_peer": "SPINES",
+                  "bfd": false
+                }
+              },
+              "templates": {},
+              "address_families": {},
+              "redistribute": []
+            }
+          },
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "inherit_peer": "SPINES"
+            },
+            "192.0.2.0/24": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "l2vpn evpn": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "route_reflector_client": true
+                }
+              },
+              "redistribute": [],
+              "inherit_peer": "SPINES",
+              "bfd": false
+            },
+            "192.0.2.9": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": []
+                }
+              },
+              "redistribute": [],
+              "remote_as": "external"
+            }
+          },
+          "templates": {
+            "SPINES": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "l2vpn evpn": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "extended_community": true
+                }
+              },
+              "redistribute": [],
+              "remote_as": "65000",
+              "update_source": "Loopback0",
+              "bfd": true
+            }
+          },
+          "address_families": {},
+          "redistribute": [],
+          "router_id": "192.0.2.11",
+          "asn": 65000
+        },
+        "ospf": {
+          "UNDERLAY": {
+            "vrfs": {
+              "BLUE": {
+                "vrfs": {},
+                "neighbors": {},
+                "templates": {},
+                "address_families": {},
+                "redistribute": [],
+                "router_id": "192.0.2.111"
+              }
+            },
+            "neighbors": {},
+            "templates": {},
+            "address_families": {},
+            "redistribute": [],
+            "router_id": "192.0.2.11"
+          }
+        },
+        "vpc_domain": {
+          "peer_keepalive": {
+            "destination": "192.0.2.12",
+            "source": "192.0.2.11",
+            "vrf": "management"
+          },
+          "virtual_peer_link": {
+            "destination": "192.0.2.22",
+            "source": "192.0.2.21"
+          },
+          "peer_gateway": true,
+          "peer_switch": true,
+          "layer3_peer_router": true,
+          "id": 7
+        },
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "nv_overlay_evpn": true,
+        "segments": [
+          {
+            "vlan_id": 110,
+            "vni": 10110,
+            "vrf": "production",
+            "prefix": "10.110.0.0/24",
+            "gateway": "10.110.0.1",
+            "anycast": true,
+            "acl_bindings": {}
+          }
+        ],
+        "config_digest": "91f8850f9fa8c64ea573bdc7b53d33c9f92334028c9d334e3d7a94d9312a391e",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "nve_l2_without_evpn",
+            "vni": 10120
+          },
+          {
+            "code": "nve_l2_without_evpn",
+            "vni": 10200
+          },
+          {
+            "code": "nve_l2_without_vlan",
+            "vni": 10200
+          },
+          {
+            "code": "evpn_vni_without_nve",
+            "vni": 10300
+          },
+          {
+            "code": "l3_vni_without_nve",
+            "vni": 60000,
+            "vrf": "green"
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

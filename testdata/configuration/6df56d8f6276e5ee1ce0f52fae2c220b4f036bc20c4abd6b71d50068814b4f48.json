@@ -1,0 +1,52 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nfabric forwarding anycast-gateway-mac 0200.0000.000g\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "e97db1ee5184c6b50fba04a410984a7c7f26c8d4ab9a6c136f583ff0c1e20b01",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 2
+      }
+    ],
+    "evidence": []
+  }
+}

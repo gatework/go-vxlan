@@ -1,0 +1,45 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nobject-group ip address admins\n  30 host 192.0.2.1\n  10 198.51.100.0/24\n  20 host 192.0.2.1\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {
+          "admins": [
+            "192.0.2.1/32",
+            "198.51.100.0/24"
+          ]
+        },
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "7334f959f2ce1dae8667c248168fc18ae613596a754a0dedb4c6449693af0c2c",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

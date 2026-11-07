@@ -1,0 +1,66 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  address-family ipv4 unicast\n    network 2001:db8::/32 route-map POLICY\nroute-map POLICY permit 10\n  match ip address prefix-list LIST\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": [
+            {
+              "prefix_lists": [
+                "LIST"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "LIST"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "53536ec4e5773c5cb65945da3e300d75907825517cc8c18baeabd70bf5af935b",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 2
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

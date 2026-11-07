@@ -1,0 +1,61 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvlan 2001\n  vn-segment 50100\nvrf context BLUE\n  vni 50100\ninterface Vlan2001\n  vrf member BLUE\n  ip forward\ninterface nve1\n  member vni 50100 associate-vrf\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan2001": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "vrf": "BLUE",
+            "ip_forward": true
+          }
+        },
+        "vlan_vnis": {
+          "2001": 50100
+        },
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [],
+            "routes": [],
+            "vni": 50100
+          }
+        },
+        "nve": {
+          "members": {
+            "50100": {
+              "associate_vrf": true
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "f0674640df4f2ef1e8419194a2e4c078a8d03fb971f150357fd1111f7f2d1e30",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

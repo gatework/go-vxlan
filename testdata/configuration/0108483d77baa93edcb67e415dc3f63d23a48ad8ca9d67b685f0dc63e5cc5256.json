@@ -1,0 +1,56 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\r\ninterface Vlan10\r\n  description Users\r\n  vrf member BLUE\r\n  ip address 10.0.10.1/24\r\n! retained comment\r\n\r\ninterface Ethernet1/1\r\n  no shutdown\r\nend\r\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan10": {
+            "addresses": [
+              "10.0.10.1/24"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "description": "Users",
+            "vrf": "BLUE"
+          },
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "shutdown": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "cb9b204ba6d671eda427762a45804fd2f146c6f71950d28a6eb2b5151d29e016",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

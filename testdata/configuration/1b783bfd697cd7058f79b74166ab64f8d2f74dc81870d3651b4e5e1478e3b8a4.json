@@ -1,0 +1,50 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface nve1\n  source-interface Loopback1\n  source-interface Loopback0\n  source-interface Loopback1\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {},
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "76fae9fdc86b77c42ad6c69c804c11907ca82da5242952c91228ccadf55d2504",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 4
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

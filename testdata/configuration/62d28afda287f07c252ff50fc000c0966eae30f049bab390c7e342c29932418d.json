@@ -1,0 +1,53 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Vlan10\n  description Users\n  --More--\n  no shutdown\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan10": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "description": "Users",
+            "shutdown": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "0d93c7cd517ecac9967cf70ddb86626e0060fa551a92617c21d57a6b16752cbb",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "incomplete_configuration",
+        "line": 4
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\r\nfeature bgp\r\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [
+          "bgp"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "d4c1397462b88ca823c581ef6d1cd2a712f2e152f62653036a8dbf72174c3f1c",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvrf context BLUE\n  address-family ipv4 unicast\n    route-target both auto evpn\n    export vrf default 100 map SHARED allow-vpn\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [
+              {
+                "direction": "both",
+                "target": "auto",
+                "evpn": true,
+                "address_family": "ipv4 unicast"
+              }
+            ],
+            "routes": [],
+            "exports": [
+              {
+                "vrf": "default",
+                "prefix_limit": 100,
+                "route_map": "SHARED",
+                "allow_vpn": true,
+                "address_family": "ipv4 unicast"
+              }
+            ]
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "0f6b07d0ff6b37e1c3997cc0c06340cb8e257053daddc6185f36c21b9105593c",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

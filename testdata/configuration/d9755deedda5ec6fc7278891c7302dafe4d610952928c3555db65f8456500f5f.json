@@ -1,0 +1,47 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nroute-map POLICY permit 10\n  match ip address prefix-list SAFE\nroute-map POLICY permit 10\n  invalid-policy-command\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": []
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "586abf282dbb5843815bc3925684e8456dd94c15aac5c025b94ff0be6e2e179d",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_route_map_entry",
+        "line": 4
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

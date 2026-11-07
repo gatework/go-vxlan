@@ -1,0 +1,52 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Vlan10\n  ip address 999.0.0.1/24\n  description Not visited\ninterface Ethernet1/1\n  no shutdown\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "shutdown": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "af444872730335505cf4f9cc3570fd60b321ef618afccdbc0c6d7ba2ebec519c",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 2
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

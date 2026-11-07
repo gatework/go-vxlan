@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{"address_groups":{"admins":["192.0.2.0/24"]}},"entries":null},"expected":null,"error":null}

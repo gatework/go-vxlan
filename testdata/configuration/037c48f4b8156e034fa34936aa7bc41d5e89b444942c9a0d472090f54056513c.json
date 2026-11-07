@@ -1,0 +1,45 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvlan 110\n  vn-segment 16777216\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "784b69b73154835608a1e1a91b989c324671cc785cbe705514f97e32d722481b",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 2
+      }
+    ],
+    "evidence": []
+  }
+}

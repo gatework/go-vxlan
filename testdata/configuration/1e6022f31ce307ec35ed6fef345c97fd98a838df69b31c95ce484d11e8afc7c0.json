@@ -1,0 +1,46 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nip route 10.1.0.0/16 Vlan100\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [
+          {
+            "prefix": "10.1.0.0/16",
+            "next_hop": "Vlan100",
+            "options": ""
+          }
+        ],
+        "segments": [],
+        "config_digest": "9b88e28d7282bc56ff7b1e06faf68e569bd99d79231f4e735e3af97218916551",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

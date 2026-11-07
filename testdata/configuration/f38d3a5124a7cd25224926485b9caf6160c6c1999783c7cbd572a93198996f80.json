@@ -1,0 +1,60 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  address-family l2vpn evpn\n    no send-community both\n    no advertise-pip\n    no next-hop-self\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {},
+          "templates": {},
+          "address_families": {
+            "l2vpn evpn": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "standard_community": false,
+              "extended_community": false,
+              "advertise_pip": false,
+              "next_hop_self": false,
+              "next_hop_self_all": false
+            }
+          },
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "dc6f64f2f21f72f8b4006fc9a740c282ef59abce435c13675873fce63edb3178",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

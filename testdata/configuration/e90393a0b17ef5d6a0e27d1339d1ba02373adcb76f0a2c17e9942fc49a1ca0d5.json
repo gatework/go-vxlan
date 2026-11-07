@@ -1,0 +1,52 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\nrouter bgp 4294967296\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "884d91b1a79ce48a2ae672c7886aec39c3dc1d133097113ef889deee99e71b2c",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_bgp_process",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

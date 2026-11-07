@@ -1,0 +1,47 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nobject-group ip address admins\n  10 group-object other\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {
+          "admins": []
+        },
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "81bde845e994ec36c2d757983b1efccb8173a972892a4a18ab210fcb51be58d8",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

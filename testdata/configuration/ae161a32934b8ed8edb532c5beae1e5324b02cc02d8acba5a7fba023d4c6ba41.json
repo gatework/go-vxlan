@@ -1,0 +1,75 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nrouter bgp 65000\n  template peer SPINE\n    inherit peer BASE\n  template peer BASE\n    address-family l2vpn evpn\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {},
+          "templates": {
+            "SPINE": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "inherit_peer": "BASE"
+            },
+            "BASE": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "l2vpn evpn": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": []
+                }
+              },
+              "redistribute": []
+            }
+          },
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "54cd923eaf0788d8af4d31d661d982f028c723d3ed02ab933d659c1f01c259c2",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_peer_inheritance"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

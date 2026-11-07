@@ -1,0 +1,148 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nip prefix-list SOURCES seq 10 permit 192.0.2.0/24\nroute-map INBOUND permit 10\n  match ip route-source prefix-list SOURCES\nroute-map OVERRIDE permit 10\n  match ip next-hop prefix-list SOURCES\nrouter bgp 65000\n  template peer EDGES\n    address-family ipv4 unicast\n      route-map INBOUND in\n      route-map INBOUND out\n  neighbor 192.0.2.1\n    inherit peer EDGES\n    address-family ipv4 unicast\n      route-map OVERRIDE in\n  address-family ipv4 unicast\n    network 192.0.2.0/24 route-map INBOUND\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "route_maps": {
+                    "in": "OVERRIDE"
+                  }
+                }
+              },
+              "redistribute": [],
+              "inherit_peer": "EDGES"
+            }
+          },
+          "templates": {
+            "EDGES": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "route_maps": {
+                    "in": "INBOUND",
+                    "out": "INBOUND"
+                  }
+                }
+              },
+              "redistribute": []
+            }
+          },
+          "address_families": {
+            "ipv4 unicast": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "networks": [
+                {
+                  "prefix": "192.0.2.0/24",
+                  "route_map": "INBOUND"
+                }
+              ]
+            }
+          },
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "SOURCES": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "INBOUND": [
+            {
+              "prefix_lists": [],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "route-source",
+                  "names": [
+                    "SOURCES"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ],
+          "OVERRIDE": [
+            {
+              "prefix_lists": [],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "next-hop",
+                  "names": [
+                    "SOURCES"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "fe6ce1ff92a7df3551d39d8c50081ba8b67a1e9a496ec56a23a6c0e71855e1f6",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

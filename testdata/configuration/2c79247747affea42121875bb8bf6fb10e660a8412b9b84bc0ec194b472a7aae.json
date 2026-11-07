@@ -1,0 +1,48 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nip access-list protect\n  10 permit ip any any time-range WINDOW\ntime-range WINDOW\n  periodic weekdays 09:00:00 to 17:00:00\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {
+          "protect": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "expression": "ip any any time-range WINDOW"
+            }
+          ]
+        },
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "5defa5acbdbe9f11dea2abf25869bdd9990e38d462f2c52ffda5926398d3b1ff",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

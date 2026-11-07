@@ -1,0 +1,61 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nevpn\n  vni 50100 l2\ninterface nve1\n  member vni 50100 associate-vrf\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {
+            "50100": {
+              "associate_vrf": true
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {
+          "50100": {
+            "route_targets": [],
+            "routes": [],
+            "type": "l2"
+          }
+        },
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "62dea586b67ebc2658252771665b18a70edccdd9242f453735ed2fc07580d0d3",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "nve_l3_without_vrf",
+            "vni": 50100
+          },
+          {
+            "code": "vni_layer_conflict",
+            "vni": 50100,
+            "evpn_type": "l2"
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

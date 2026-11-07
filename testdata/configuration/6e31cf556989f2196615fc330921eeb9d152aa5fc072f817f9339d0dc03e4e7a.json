@@ -1,0 +1,88 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nip prefix-list SHARED seq 10 permit 192.0.2.0/24\nip prefix-list OTHER seq 10 permit 198.51.100.0/24\nipv6 prefix-list SHARED seq 10 permit 2001:db8::/32\nroute-map SHARED permit 10\nroute-map OTHER permit 10\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "SHARED": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": null,
+              "le": null
+            }
+          ],
+          "OTHER": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "198.51.100.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {
+          "SHARED": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "2001:db8::/32",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "route_maps": {
+          "SHARED": [
+            {
+              "prefix_lists": [],
+              "additional_matches": [],
+              "sets": [],
+              "action": "permit",
+              "sequence": 10
+            }
+          ],
+          "OTHER": [
+            {
+              "prefix_lists": [],
+              "additional_matches": [],
+              "sets": [],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "1ccac33a08183f90efc7536c9e8384c221a30b22383fbfd61843772c89805e65",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

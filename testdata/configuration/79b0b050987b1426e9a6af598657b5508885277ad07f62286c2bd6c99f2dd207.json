@@ -1,0 +1,50 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvrf context BLUE\n  address-family ipv4 unicast\n    export vrf default 1000 map EXPORT unknown\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [],
+            "routes": []
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "6a445d9a35b70915a53ebe401d6679931713598cbbe39a2ef7d8094cfdd08130",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 4
+      }
+    ],
+    "evidence": []
+  }
+}

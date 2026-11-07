@@ -1,0 +1,59 @@
+{
+  "name": "configuration",
+  "text": "hostname SECOND\nhostname FIRST\nhostname SECOND\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": null,
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "bfadb0902b6fdf68d8b5bdeeee00a3e0ce50e9435caf28f3f6cf13d2333ce408",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_hostname",
+        "line": 2
+      },
+      {
+        "code": "duplicate_hostname",
+        "line": 3
+      },
+      {
+        "code": "hostname_missing"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

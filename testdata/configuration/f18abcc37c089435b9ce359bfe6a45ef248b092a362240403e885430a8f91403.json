@@ -1,0 +1,55 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  shutdown\n  no shutdown\n  shutdown\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "413aab0eb2f3d819225a4f2f8aa53552956df0ab715ade1bbb888c86c3c8c0d1",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 4
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nfabric forwarding anycast-gateway-mac 02:00:ab:cd:00:01\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "anycast_mac": "02:00:ab:cd:00:01",
+        "segments": [],
+        "config_digest": "0c34cf09ade4ad07b6c594de3c60382569f0fc5a4b16f8ef69cf920decf1e16e",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

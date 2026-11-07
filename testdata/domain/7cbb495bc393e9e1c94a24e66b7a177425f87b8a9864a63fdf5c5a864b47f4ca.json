@@ -1,0 +1,1 @@
+{"name":"fingerprint","input":{"value":{"rules":[{"action":"deny","expression":"ip addrgroup admins any"},{"action":"permit","expression":"ip any any"}],"address_groups":{"admins":["192.0.2.0/24"]}}},"expected":"05544f516120f99c7c27749275246678c9a80ae477986d98fc51e5dd6ca982aa","error":null}

@@ -1,0 +1,86 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvlan 8\n  vn-segment 10008\nvrf context tenant\ninterface Vlan8\n  vrf member tenant\n  ip address 192.0.2.254/24\n  fabric forwarding mode anycast-gateway\n  ip access-group protect out\nip access-list protect\n  10 deny ip any any\nend\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan8": {
+            "addresses": [
+              "192.0.2.254/24"
+            ],
+            "acl_bindings": {
+              "out": "protect"
+            },
+            "anycast": true,
+            "vrf": "tenant"
+          }
+        },
+        "vlan_vnis": {
+          "8": 10008
+        },
+        "vrfs": {
+          "tenant": {
+            "route_targets": [],
+            "routes": []
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {
+          "protect": [
+            {
+              "sequence": 10,
+              "action": "deny",
+              "expression": "ip any any"
+            }
+          ]
+        },
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [
+          {
+            "vlan_id": 8,
+            "vni": 10008,
+            "vrf": "tenant",
+            "prefix": "192.0.2.0/24",
+            "gateway": "192.0.2.254",
+            "anycast": true,
+            "acl_bindings": {
+              "out": "protect"
+            }
+          }
+        ],
+        "config_digest": "0b998643972459b862948832859a596411e591794806ccd1cbf5d041b955d46a",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "vlan_vni_without_nve",
+            "vni": 10008,
+            "vlan_ids": [
+              8
+            ]
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

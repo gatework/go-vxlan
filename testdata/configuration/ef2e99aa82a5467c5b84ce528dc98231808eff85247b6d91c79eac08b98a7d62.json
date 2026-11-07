@@ -1,0 +1,259 @@
+{
+  "name": "configuration",
+  "text": "hostname LEF-POLICY-01\nfeature ospf\nfeature bgp\nfeature nv overlay\nfeature bgp\nip prefix-list SHARED seq 20 deny 0.0.0.0/0 le 32\nip prefix-list SHARED seq 5 permit 10.10.0.0/16 ge 24 le 28\nip prefix-list STAGED seq 5 permit 192.0.2.0/24\nip prefix-list UNUSED seq 5 permit 198.51.100.0/24\nroute-map EXPORT permit 10\n  match ip address prefix-list SHARED SHARED\nroute-map EXPORT deny 20\n  match ip address prefix-list SHARED\nroute-map PREPARED permit 5\n  match ip address prefix-list SHARED STAGED\nroute-map RETAIN permit 10\n  match ip address prefix-list SHARED\nrouter bgp 4200000000\n  address-family ipv4 unicast\n    redistribute direct route-map EXPORT\n  address-family l2vpn evpn\n    retain route-target route-map RETAIN\n  vrf BLUE\n    address-family ipv4 unicast\n      redistribute ospf UNDERLAY route-map EXPORT\n  vrf GREEN\n    address-family ipv4 unicast\n      redistribute static route-map EXPORT\nrouter ospf UNDERLAY\n  redistribute bgp 4200000000 route-map EXPORT\n  vrf BLUE\n    redistribute direct route-map EXPORT\nend\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEF-POLICY-01",
+        "features": [
+          "bgp",
+          "nv overlay",
+          "ospf"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {
+            "BLUE": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [
+                    {
+                      "protocol": "ospf",
+                      "process": "UNDERLAY",
+                      "route_map": "EXPORT"
+                    }
+                  ]
+                }
+              },
+              "redistribute": []
+            },
+            "GREEN": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [
+                    {
+                      "protocol": "static",
+                      "route_map": "EXPORT"
+                    }
+                  ]
+                }
+              },
+              "redistribute": []
+            }
+          },
+          "neighbors": {},
+          "templates": {},
+          "address_families": {
+            "ipv4 unicast": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [
+                {
+                  "protocol": "direct",
+                  "route_map": "EXPORT"
+                }
+              ]
+            },
+            "l2vpn evpn": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "retain_route_target": "route-map RETAIN"
+            }
+          },
+          "redistribute": [],
+          "asn": 4200000000
+        },
+        "ospf": {
+          "UNDERLAY": {
+            "vrfs": {
+              "BLUE": {
+                "vrfs": {},
+                "neighbors": {},
+                "templates": {},
+                "address_families": {},
+                "redistribute": [
+                  {
+                    "protocol": "direct",
+                    "route_map": "EXPORT"
+                  }
+                ]
+              }
+            },
+            "neighbors": {},
+            "templates": {},
+            "address_families": {},
+            "redistribute": [
+              {
+                "protocol": "bgp",
+                "process": "4200000000",
+                "route_map": "EXPORT"
+              }
+            ]
+          }
+        },
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "SHARED": [
+            {
+              "sequence": 20,
+              "action": "deny",
+              "prefix": "0.0.0.0/0",
+              "ge": null,
+              "le": 32
+            },
+            {
+              "sequence": 5,
+              "action": "permit",
+              "prefix": "10.10.0.0/16",
+              "ge": 24,
+              "le": 28
+            }
+          ],
+          "STAGED": [
+            {
+              "sequence": 5,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": null,
+              "le": null
+            }
+          ],
+          "UNUSED": [
+            {
+              "sequence": 5,
+              "action": "permit",
+              "prefix": "198.51.100.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "EXPORT": [
+            {
+              "prefix_lists": [
+                "SHARED",
+                "SHARED"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "SHARED",
+                    "SHARED"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            },
+            {
+              "prefix_lists": [
+                "SHARED"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "SHARED"
+                  ]
+                }
+              ],
+              "action": "deny",
+              "sequence": 20
+            }
+          ],
+          "PREPARED": [
+            {
+              "prefix_lists": [
+                "SHARED",
+                "STAGED"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "SHARED",
+                    "STAGED"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 5
+            }
+          ],
+          "RETAIN": [
+            {
+              "prefix_lists": [
+                "SHARED"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "SHARED"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "33cb4a640f33b026d7d1e0cf016ac04516ec510e83b9deaa25c1f7496049afa2",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

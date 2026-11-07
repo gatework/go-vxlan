@@ -1,0 +1,60 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  neighbor 192.0.2.1\n    remote-as 65001\n    remote-as 65002\n    remote-as 65001\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {},
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "a2c070b23875550ee1f985d9a36342f8783b99f6b0772b82390bb04e7e057851",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 6
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

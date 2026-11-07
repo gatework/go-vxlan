@@ -1,0 +1,67 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  neighbor 192.0.2.1\n    advertise-pip\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": []
+            }
+          },
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "29611e65b64f7fa0848ddfafe2741f6fa6ca97eb15f1851911490ddf3128bdec",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 4
+      }
+    ],
+    "evidence": []
+  }
+}

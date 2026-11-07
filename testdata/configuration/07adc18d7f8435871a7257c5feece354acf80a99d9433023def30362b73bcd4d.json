@@ -1,0 +1,48 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Vlan1100\n  ip access-group absent out\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan1100": {
+            "addresses": [],
+            "acl_bindings": {
+              "out": "absent"
+            },
+            "anycast": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "a1b1c3df27e169767b675f3624238b204afdd045d2d754399de32b130ad1be5a",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

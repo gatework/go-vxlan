@@ -1,0 +1,62 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  router-id 192.0.2.10\n  neighbor 2001:db8::/129\n    remote-as 65001\n  neighbor 192.0.2.1\n    remote-as 65002\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65002"
+            }
+          },
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "router_id": "192.0.2.10",
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "6adaffaff260e9c2afe168eca964e5ae0badac022640f990e2eb2697564361ed",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 4
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

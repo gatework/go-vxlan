@@ -1,0 +1,60 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nrouter bgp 65000\n  neighbor 192.0.2.1\n    inherit peer MISSING\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "inherit_peer": "MISSING"
+            }
+          },
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "bc54a3c5aae492f7abdc68d5bdaf99552eaad0927adf28287b1308d6ddc59470",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "missing_peer_template"
+      }
+    ],
+    "evidence": []
+  }
+}

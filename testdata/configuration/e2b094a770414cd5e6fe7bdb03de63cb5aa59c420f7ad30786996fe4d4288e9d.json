@@ -1,0 +1,56 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface nve2\n  source-interface loopback1\n  member vni 10020\ninterface nve1\n  source-interface loopback0\n  member vni 10010\ninterface nve2\n  source-interface loopback1\n  member vni 10020\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "9fba2d9605e719d502890428a2b06183570618ddb05905e84f5293736674a7fb",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "multiple_nve_interfaces",
+        "line": 5
+      },
+      {
+        "code": "multiple_nve_interfaces",
+        "line": 8
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

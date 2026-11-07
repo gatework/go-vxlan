@@ -1,0 +1,1 @@
+{"name":"fingerprint","input":{"value":{"text":"\\u2028","nested":{"b":2,"a":1}}},"expected":"132b446b96b2a4ab8c214e3407ce5b3452ea5be4226bb580f28284df1256b946","error":null}

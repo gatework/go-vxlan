@@ -1,0 +1,73 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  inherit peer MISSING\nroute-map POLICY permit 10\n  match ip address prefix-list LIST\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {},
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": [
+            {
+              "prefix_lists": [
+                "LIST"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "LIST"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "2ea02638f6c5fcc0d7e88311ec733ee641933ca5738b6bcb6bca83e080e751cf",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "evidence": []
+  }
+}

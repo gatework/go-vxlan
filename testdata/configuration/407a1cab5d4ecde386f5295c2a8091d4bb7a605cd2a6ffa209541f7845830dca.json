@@ -1,0 +1,47 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nipv6 prefix-list BAD seq 10 permit 2001:db8::/32 le 129\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {
+          "BAD": []
+        },
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "6b0d94c100d01dbcdb1b0a57f5af71e1dd2913f1dcc92659b9e90ee32a537839",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 2
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

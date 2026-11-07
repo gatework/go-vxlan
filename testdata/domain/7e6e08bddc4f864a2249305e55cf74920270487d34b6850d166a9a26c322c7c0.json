@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{"address_groups":{}},"entries":[{"sequence":10,"action":"deny","expression":"ip any 192.0.2.0/24"},{"sequence":20,"action":"permit","expression":"ip any any"}]},"expected":{"rules":[{"action":"deny","expression":"ip any 192.0.2.0/24"},{"action":"permit","expression":"ip any any"}],"address_groups":{}},"error":null}

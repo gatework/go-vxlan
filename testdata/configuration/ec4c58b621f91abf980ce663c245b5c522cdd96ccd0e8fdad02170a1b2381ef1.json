@@ -1,0 +1,55 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvpc domain 1\n  peer-keepalive destination 192.0.2.2\n  peer-keepalive destination 192.0.2.1\n  peer-keepalive destination 192.0.2.2\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": {
+          "virtual_peer_link": {},
+          "peer_gateway": false,
+          "peer_switch": false,
+          "layer3_peer_router": false,
+          "id": 1
+        },
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "980e75e20fc96c416fc7365c83d1a91315033edcec2a94dbe35d6f3e771b4be7",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 4
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

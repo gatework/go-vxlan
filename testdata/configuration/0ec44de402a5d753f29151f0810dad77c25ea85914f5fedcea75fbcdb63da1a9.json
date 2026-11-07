@@ -1,0 +1,73 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  address-family arbitrary garbage\n    redistribute direct route-map POLICY\nroute-map POLICY permit 10\n  match ip address prefix-list LIST\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {},
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": [
+            {
+              "prefix_lists": [
+                "LIST"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "LIST"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "bb72b2aef9765c89413bd40f86a67565ac1b5fff1137d7d07da946565d1496aa",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

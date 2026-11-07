@@ -1,0 +1,51 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  mtu 1500\n  mtu 1500\n  mtu 9000\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "5aa0ae15587fb1a5437e262ab8f498fa6cdf13f22b99b44f45ea329a2b356374",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

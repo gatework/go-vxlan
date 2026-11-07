@@ -1,0 +1,66 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nip prefix-list LIST seq 10 permit 192.0.2.0/24\nipv6 prefix-list LIST seq 10 permit 2001:db8::/32\nipv6 prefix-list OTHER seq 10 permit 2001:db8:1::/48\nipv6 prefix-list LIST seq 10 deny 2001:db8:2::/48\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "LIST": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {
+          "LIST": [],
+          "OTHER": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "2001:db8:1::/48",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "6afa751b43e521581dec5e542169d0d7a025ad8abfe2d455e2c64c08262366fa",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

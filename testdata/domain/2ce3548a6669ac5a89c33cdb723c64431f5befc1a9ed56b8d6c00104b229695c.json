@@ -1,0 +1,1 @@
+{"name":"fingerprint","input":{"value":{"rules":[{"action":"deny","expression":"ip any 192.0.2.0/24"},{"action":"permit","expression":"ip any any"}],"address_groups":{}}},"expected":"c8660f2e7827f9d10f86f4e2a14df2feecc49f98dd8abbcc91d03ec41b45b806","error":null}

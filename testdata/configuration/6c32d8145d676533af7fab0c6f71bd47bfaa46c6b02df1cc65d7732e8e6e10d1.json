@@ -1,0 +1,46 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nip route 10.1.0.0/16 port-channel 10 track 12\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [
+          {
+            "prefix": "10.1.0.0/16",
+            "next_hop": "port-channel",
+            "options": "10 track 12"
+          }
+        ],
+        "segments": [],
+        "config_digest": "2c478f8b2e6afd321353ce45b37c009cd7ca5dc380c5ee8c2ca6be86d5af2ba3",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

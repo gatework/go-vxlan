@@ -1,0 +1,1 @@
+{"name":"acl_rules","input":{"entries":[{"sequence":100,"action":"permit","expression":"ip any any"},{"sequence":200,"action":"deny","expression":"ip any 192.0.2.0/24"}]},"expected":[{"action":"permit","expression":"ip any any"},{"action":"deny","expression":"ip any 192.0.2.0/24"}],"error":null}

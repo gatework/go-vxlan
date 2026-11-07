@@ -1,0 +1,65 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  mtu 9216\n  no switchport\n  ip ospf network point-to-point\ninterface Ethernet1/2\n  switchport mode access\n  switchport access vlan 110\ninterface Vlan110\n  ip forward\ninterface nve1\n  description UPLINK\n  advertise virtual-rmac\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 9216,
+            "switchport": false,
+            "ospf_network_type": "point-to-point"
+          },
+          "Ethernet1/2": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "switchport_mode": "access",
+            "access_vlan": 110
+          },
+          "Vlan110": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "ip_forward": true
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {},
+          "description": "UPLINK",
+          "advertise_virtual_rmac": true,
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "a40bccd91f7b36412486b3d404f833ae18ca7fa9b69874c5b49b1399ee9279a2",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvlan 8\n  vn-segment 10008\nvrf context tenant\ninterface Vlan8\n  vrf member tenant\n  ip address 192.0.2.254/24\n  fabric forwarding mode anycast-gateway\nip access-list protect\n  10 deny ip any any\nend\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan8": {
+            "addresses": [
+              "192.0.2.254/24"
+            ],
+            "acl_bindings": {},
+            "anycast": true,
+            "vrf": "tenant"
+          }
+        },
+        "vlan_vnis": {
+          "8": 10008
+        },
+        "vrfs": {
+          "tenant": {
+            "route_targets": [],
+            "routes": []
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {
+          "protect": [
+            {
+              "sequence": 10,
+              "action": "deny",
+              "expression": "ip any any"
+            }
+          ]
+        },
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [
+          {
+            "vlan_id": 8,
+            "vni": 10008,
+            "vrf": "tenant",
+            "prefix": "192.0.2.0/24",
+            "gateway": "192.0.2.254",
+            "anycast": true,
+            "acl_bindings": {}
+          }
+        ],
+        "config_digest": "ef8d34393ab625b8d245e7004c31e1eb4fa37efaa9205e1081a61b90b69e811a",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "vlan_vni_without_nve",
+            "vni": 10008,
+            "vlan_ids": [
+              8
+            ]
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

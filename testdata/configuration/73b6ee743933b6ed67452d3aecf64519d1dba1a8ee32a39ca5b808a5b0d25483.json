@@ -1,0 +1,49 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface nve1\n  member vni 50100 associate-vrf\n",
+  "complete": false,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {
+            "50100": {
+              "associate_vrf": true
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "7b615842d2d1e7aa099f6e538f1390376f3c63ffa5805c312f0746efcbe033fc",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "output_incomplete"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

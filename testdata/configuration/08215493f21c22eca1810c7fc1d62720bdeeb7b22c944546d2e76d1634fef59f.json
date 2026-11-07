@@ -1,0 +1,104 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvrf context BLUE\n  address-family ipv4 multicast\n    address-family ipv4 unicast\n      export vrf default map REJECTED\n  address-family ipv4 unicast\n    address-family ipv6 unicast\n      export vrf default map REJECTED\n    route-target import 65000:10 evpn\n    export vrf default map V4\n  address-family ipv6 unicast\n    route-target export 65000:20 evpn\n    export vrf default map V6\nroute-map REJECTED permit 10\n  match ip address prefix-list LIST\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [
+              {
+                "direction": "import",
+                "target": "65000:10",
+                "evpn": true,
+                "address_family": "ipv4 unicast"
+              },
+              {
+                "direction": "export",
+                "target": "65000:20",
+                "evpn": true,
+                "address_family": "ipv6 unicast"
+              }
+            ],
+            "routes": [],
+            "exports": [
+              {
+                "vrf": "default",
+                "prefix_limit": null,
+                "route_map": "V4",
+                "allow_vpn": false,
+                "address_family": "ipv4 unicast"
+              },
+              {
+                "vrf": "default",
+                "prefix_limit": null,
+                "route_map": "V6",
+                "allow_vpn": false,
+                "address_family": "ipv6 unicast"
+              }
+            ]
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "REJECTED": [
+            {
+              "prefix_lists": [
+                "LIST"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "LIST"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "91f31da0e339bfcdb95c470bffcc888c39fc9228c748394b7cd77ec8fddc71c5",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      },
+      {
+        "code": "unsupported_configuration",
+        "line": 7
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

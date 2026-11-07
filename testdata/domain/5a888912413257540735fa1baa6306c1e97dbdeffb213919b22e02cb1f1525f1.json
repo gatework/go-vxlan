@@ -1,0 +1,1 @@
+{"name":"route_targets","input":{"entries":[{"direction":"both","target":":10008"}],"asn":null,"vni":10008},"expected":[[null,false,"export",":10008"],[null,false,"import",":10008"]],"error":null}

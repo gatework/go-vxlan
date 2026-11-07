@@ -1,0 +1,105 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  verify:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+        go: ['1.26.0', '1.27.3']
+    runs-on: ${{ matrix.os }}
+    env:
+      GOTOOLCHAIN: local
+      GOWORK: 'off'
+      GOFLAGS: -mod=readonly
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go.sum
+      - run: go mod verify
+      - run: go mod tidy -diff
+      - run: go vet ./...
+      - run: go test -race -count=1 -timeout=180s ./...
+      - if: matrix.go == '1.27.3'
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          govulncheck ./...
+  release-check:
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - run: python3 scripts/test-reuse-release.py
+      - run: python3 scripts/test-publish-release.py
+  package:
+    needs: [verify, release-check]
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
+    env:
+      GOTOOLCHAIN: local
+      GOWORK: 'off'
+      GOFLAGS: -mod=readonly
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: go.sum
+      - run: sh scripts/package.sh
+      - name: Verify release archives
+        run: |
+          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' cli/app.go)
+          sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
+      - id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: source-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+  package-smoke:
+    permissions:
+      contents: read
+      actions: read
+    needs: package
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ARTIFACT_ID: ${{ needs.package.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Download the immutable package artifact
+        run: |
+          test -n "$ARTIFACT_ID"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > artifact.zip
+          mkdir dist
+          unzip -q artifact.zip -d dist
+      - name: Validate and execute the packaged binary
+        run: |
+          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' cli/app.go)
+          sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
+          python3 scripts/package-smoke.py dist "v$version"

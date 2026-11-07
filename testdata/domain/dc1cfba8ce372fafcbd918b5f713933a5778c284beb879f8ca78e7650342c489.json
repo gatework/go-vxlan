@@ -1,0 +1,1 @@
+{"name":"build","input":{"change":{"kind":"vlan_vni_add","vlan":8,"vni":10008,"vrf":"tenant","address":"192.0.2.254/24"}},"expected":{"change":{"kind":"vlan_vni_add","vlan":8,"vni":10008,"vrf":"tenant","address":"192.0.2.254/24"},"commands":["configure terminal","vlan 8","  vn-segment 10008","end"],"rollback":["configure terminal","vlan 8","  no vn-segment","end"]},"error":null}

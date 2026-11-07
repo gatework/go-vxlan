@@ -1,0 +1,53 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Vlan10\n  description Users\n  switchport\n  ip address dhcp extra\n! comment\nusername admin password SECRET\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan10": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "description": "Users",
+            "switchport": true
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "56ec7b9071df056474e69b86b85fffd5763b7ef5297ced7060c7e45840aba4c1",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

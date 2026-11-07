@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{},"entries":[{"sequence":10,"action":"permit","expression":"ip any any time-range WINDOW"}]},"expected":null,"error":null}

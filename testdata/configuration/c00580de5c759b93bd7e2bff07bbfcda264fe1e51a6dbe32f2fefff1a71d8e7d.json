@@ -1,0 +1,54 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface nve1\n  member vni 10010\n    no suppress-arp\n    suppress-arp\n    no suppress-arp\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {
+            "10010": {
+              "associate_vrf": false
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "ffc5bc44baf0b835b758ac8dba9e92772dea45634b11a3eb6950dc9274963532",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 6
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

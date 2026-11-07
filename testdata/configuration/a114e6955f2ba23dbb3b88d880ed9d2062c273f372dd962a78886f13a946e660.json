@@ -1,0 +1,51 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nevpn\n  vni 10010 l2\n    address-family ipv4 unicast\n      route-target both auto evpn\n      export vrf default map POLICY\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {
+          "10010": {
+            "route_targets": [],
+            "routes": [],
+            "type": "l2"
+          }
+        },
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "87587a0e3449c80aab143858d69e8ddf0d90cd96d05b603db518b0fefa6b14f3",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 4
+      }
+    ],
+    "evidence": []
+  }
+}

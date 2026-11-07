@@ -1,0 +1,51 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvlan 110\n  vn-segment 10110\ninterface Vlan110\n  vrf member BLUE\n  ip address 10.0.0.1/24\ninterface Vlan110\n  vrf member GREEN\n  ip address 10.0.1.1/24\ninterface Vlan110\n  vrf member RED\n  ip address 10.0.2.1/24\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {
+          "110": 10110
+        },
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "857a942f68bede84d518ebd7f212da4034d5c07e5498b5949cd5eed2295549df",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_identity",
+        "line": 7
+      },
+      {
+        "code": "duplicate_identity",
+        "line": 10
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

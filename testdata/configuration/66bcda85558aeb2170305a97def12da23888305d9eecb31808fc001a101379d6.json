@@ -1,0 +1,48 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nfeature bgp\nno feature bgp\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [
+          "bgp"
+        ],
+        "disabled_features": [
+          "bgp"
+        ],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "0af0bd51684856826ec752f7c1b7841049d09653f92c27fb6663417c3dcf6c47",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_feature_state"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

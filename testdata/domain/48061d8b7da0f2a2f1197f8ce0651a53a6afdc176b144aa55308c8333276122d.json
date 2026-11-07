@@ -1,0 +1,1 @@
+{"name":"scope","input":{"policy":{"fabrics":{"A":{"leaves":["192.0.2.1"],"borders":["192.0.2.1"]}}}},"expected":null,"error":"ArgumentError"}

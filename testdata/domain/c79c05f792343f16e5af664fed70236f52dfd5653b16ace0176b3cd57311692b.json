@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{"interfaces":{"Vlan8":{"acl_bindings":{}},"Ethernet1/1":{"acl_bindings":{"in":"protect"}}},"vlan_vnis":{"8":10008},"acls":{}},"entries":[{"sequence":10,"action":"deny","expression":"ip any any"}]},"expected":{"rules":[{"action":"deny","expression":"ip any any"}],"address_groups":{}},"error":null}

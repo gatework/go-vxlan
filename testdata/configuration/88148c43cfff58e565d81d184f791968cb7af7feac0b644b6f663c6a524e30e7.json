@@ -1,0 +1,62 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  ip unnumbered loopback0\ninterface loopback0\n  ip unnumbered loopback0\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "unnumbered_interface": "loopback0"
+          },
+          "loopback0": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "unnumbered_interface": "loopback0"
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "29bc53ee649e7940ea47a6d3f56d6b3a2209ee8e19bee787c26e80fe01637172",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unresolved_unnumbered_interface",
+        "interface": "Ethernet1/1"
+      },
+      {
+        "code": "unresolved_unnumbered_interface",
+        "interface": "loopback0"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nnv overlay evpn\nvlan 110\n  vn-segment 10110\nvrf context BLUE\n  vni 50100\ninterface nve1\n  member vni 10110\n  member vni 50100 associate-vrf\nevpn\n  vni 10110 l2\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {
+          "110": 10110
+        },
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [],
+            "routes": [],
+            "vni": 50100
+          }
+        },
+        "nve": {
+          "members": {
+            "10110": {
+              "associate_vrf": false
+            },
+            "50100": {
+              "associate_vrf": true
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {
+          "10110": {
+            "route_targets": [],
+            "routes": [],
+            "type": "l2"
+          }
+        },
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "nv_overlay_evpn": true,
+        "segments": [],
+        "config_digest": "11575f59098dd4a2070e61da4d38268c6c677c013b722dd2bf4f377d73b0fc32",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

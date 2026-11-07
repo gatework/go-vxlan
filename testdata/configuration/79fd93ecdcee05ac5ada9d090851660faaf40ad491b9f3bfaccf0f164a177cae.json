@@ -1,0 +1,59 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  ip unnumbered loopback0\n  ip router ospf UNDERLAY area 0\ninterface Loopback0\n  ip address 192.0.2.1/32\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "unnumbered_interface": "loopback0",
+            "ospf": "UNDERLAY area 0"
+          },
+          "Loopback0": {
+            "addresses": [
+              "192.0.2.1/32"
+            ],
+            "acl_bindings": {},
+            "anycast": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {
+          "Ethernet1/1": [
+            "192.0.2.1/32"
+          ]
+        },
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "043b23ca74a467e57eda3db3b2993b0811b68bffe5589e51fdb2d0e7e99a1131",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

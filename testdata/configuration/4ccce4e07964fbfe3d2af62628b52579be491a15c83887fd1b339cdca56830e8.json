@@ -1,0 +1,60 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface Ethernet1/1\n  ip unnumbered loopback0\ninterface loopback0\n  ip address 192.0.2.1/32\n  vrf member BLUE\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "unnumbered_interface": "loopback0"
+          },
+          "loopback0": {
+            "addresses": [
+              "192.0.2.1/32"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "vrf": "BLUE"
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "025f9a68f735dd29676beacfcd01079d9d136bf994f37510a06016bca24e41ed",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unresolved_unnumbered_interface",
+        "interface": "Ethernet1/1"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

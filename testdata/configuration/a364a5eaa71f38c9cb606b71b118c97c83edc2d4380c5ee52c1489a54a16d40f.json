@@ -1,0 +1,73 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  neighbor 2001:0db8:0:0::1\n    remote-as 65001\n  neighbor 2001:db8::1\n    remote-as 65002\n  neighbor 2001:db8:0:0::1\n    remote-as 65003\n  neighbor 2001:0DB8::2\n    remote-as 65004\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "2001:0DB8::2": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65004"
+            }
+          },
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "cf5ba622fcb8eaa631a4cb82204ac838585852a555f693e28f7fcdb3caefde2e",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_identity",
+        "line": 5
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      },
+      {
+        "code": "duplicate_identity",
+        "line": 7
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 7
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface loopback0\n  ip address 192.0.2.1/32\ninterface Ethernet1/1\n  ip unnumbered loopback0\n  vrf member BLUE\n  vrf member RED\n  vrf member BLUE\ninterface Ethernet1/2\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "loopback0": {
+            "addresses": [
+              "192.0.2.1/32"
+            ],
+            "acl_bindings": {},
+            "anycast": false
+          },
+          "Ethernet1/2": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "65a9fcb30f2d653bb741f9af87f600f666a5092b39612d6e269497b9011aa072",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "conflicting_configuration_value",
+        "line": 7
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 8
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 4
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

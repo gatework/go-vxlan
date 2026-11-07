@@ -1,0 +1,89 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  vrf BLUE\n    neighbor 192.0.2.1\n      description EDGE\n      address-family ipv4 unicast\n        route-map IMPORT in\n        next-hop-self all\n        send-community both\n    address-family ipv4 unicast\n      advertise l2vpn evpn\n      advertise-pip\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {
+            "BLUE": {
+              "vrfs": {},
+              "neighbors": {
+                "192.0.2.1": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {
+                    "ipv4 unicast": {
+                      "vrfs": {},
+                      "neighbors": {},
+                      "templates": {},
+                      "address_families": {},
+                      "redistribute": [],
+                      "route_maps": {
+                        "in": "IMPORT"
+                      },
+                      "next_hop_self": true,
+                      "next_hop_self_all": true,
+                      "standard_community": true,
+                      "extended_community": true
+                    }
+                  },
+                  "redistribute": [],
+                  "description": "EDGE"
+                }
+              },
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "advertise_l2vpn_evpn": true,
+                  "advertise_pip": true
+                }
+              },
+              "redistribute": []
+            }
+          },
+          "neighbors": {},
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "7519812d3235d8bb20cfb5538fe4a8738a5f39e45660a964d154941f1effa99a",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

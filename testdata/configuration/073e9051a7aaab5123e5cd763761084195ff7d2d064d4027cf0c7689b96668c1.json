@@ -1,0 +1,88 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nip prefix-list LIST seq 10 permit 192.0.2.0/24\nip prefix-list LIST seq 20 permit 198.51.100.0/24\nip prefix-list LIST seq 10 deny 203.0.113.0/24\nip prefix-list LIST seq 10 permit 192.0.2.0/24\nroute-map POLICY permit 10\n  match ip address prefix-list AMBIGUOUS\nroute-map POLICY permit 20\n  match ip address prefix-list SAFE\nroute-map POLICY deny 10\n  match ip address prefix-list OTHER\nroute-map POLICY permit 10\n  match ip address prefix-list AMBIGUOUS\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "LIST": [
+            {
+              "sequence": 20,
+              "action": "permit",
+              "prefix": "198.51.100.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": [
+            {
+              "prefix_lists": [
+                "SAFE"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "SAFE"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 20
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "ca82c29c49044c985cd8fa023b3f274f6575fdeae29febff747033c263d63c44",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "invalid_configuration_value",
+        "line": 4
+      },
+      {
+        "code": "invalid_configuration_value",
+        "line": 5
+      },
+      {
+        "code": "duplicate_route_map_entry",
+        "line": 10
+      },
+      {
+        "code": "duplicate_route_map_entry",
+        "line": 12
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

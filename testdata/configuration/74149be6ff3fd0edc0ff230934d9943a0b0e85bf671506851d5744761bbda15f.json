@@ -1,0 +1,52 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvpc domain 10\n  fast-convergence unknown\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": {
+          "peer_keepalive": {},
+          "virtual_peer_link": {},
+          "peer_gateway": false,
+          "peer_switch": false,
+          "layer3_peer_router": false,
+          "id": 10
+        },
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "ecea84e78075742e5ed778694604fb8dc1f0edd1a9ad5d8136f97da04000a317",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_configuration",
+        "line": 3
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

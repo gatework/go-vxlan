@@ -1,0 +1,9 @@
+/bin/
+/.work/
+/.superpowers/
+/go.work
+/go.work.sum
+/vxlans/
+/vxlan-executions/
+.env
+/dist/

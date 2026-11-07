@@ -1,0 +1,87 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface nve1\n  source-interface Loopback0\n  member vni 10110\n    ingress-replication protocol bgp\n    suppress-arp\nrouter bgp 65000\n  template peer SPINES\n    remote-as 65000\n  neighbor 192.0.2.1\n    inherit peer SPINES\n    address-family l2vpn evpn\n      send-community extended\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {
+            "10110": {
+              "associate_vrf": false,
+              "replication": "bgp",
+              "suppress_arp": true
+            }
+          },
+          "source_interface": "Loopback0",
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "l2vpn evpn": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "extended_community": true
+                }
+              },
+              "redistribute": [],
+              "inherit_peer": "SPINES"
+            }
+          },
+          "templates": {
+            "SPINES": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65000"
+            }
+          },
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "68b0d3f8d0df9bd3176dbe1a74cf4ea9c2e2272b1e0cb8691fc13cb09ef9c3fb",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "nve_l2_without_vlan",
+            "vni": 10110
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

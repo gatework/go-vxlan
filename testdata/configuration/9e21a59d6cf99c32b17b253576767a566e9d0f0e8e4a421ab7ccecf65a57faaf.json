@@ -1,0 +1,73 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  neighbor 2001:0db8::/64\n    remote-as 65001\n  neighbor 2001:db8:0:0::/64\n    remote-as 65002\n  vrf BLUE\n    neighbor 2001:db8::/64\n      remote-as 65003\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {
+            "BLUE": {
+              "vrfs": {},
+              "neighbors": {
+                "2001:db8::/64": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "remote_as": "65003"
+                }
+              },
+              "templates": {},
+              "address_families": {},
+              "redistribute": []
+            }
+          },
+          "neighbors": {},
+          "templates": {},
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "579561d9ef6623627c6ee728375a8f7efce0859f4fb8a15092bf61edc957efaf",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_identity",
+        "line": 5
+      },
+      {
+        "code": "conflicting_configuration_value",
+        "line": 5
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

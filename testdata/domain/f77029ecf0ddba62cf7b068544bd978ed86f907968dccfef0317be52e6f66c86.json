@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{"address_groups":{}},"entries":[{"sequence":10,"action":"deny","expression":"ip addrgroup admins any"}]},"expected":null,"error":null}

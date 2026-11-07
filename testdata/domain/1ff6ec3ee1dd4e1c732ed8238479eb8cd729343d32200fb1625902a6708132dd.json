@@ -1,0 +1,1 @@
+{"name":"build","input":{"change":{"kind":"svi_acl","vlan":null,"vni":10008,"acl":"protect","direction":"out","entries":[{"sequence":10,"action":"deny","expression":"ip any any"}],"create_acl":true,"previous_binding":null}},"expected":null,"error":"ArgumentError"}

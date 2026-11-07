@@ -1,0 +1,99 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nfabric forwarding anycast-gateway-mac 0001.0001.0001\nvlan 8\n  vn-segment 10008\n  name SERVICE\nvrf context tenant\ninterface Vlan8\n  vrf member tenant\n  ip address 192.0.2.254/24\n  fabric forwarding mode anycast-gateway\ninterface nve1\n  member vni 10008\n    ingress-replication protocol bgp\nevpn\n  vni 10008 l2\n    rd auto\n    route-target import auto\n    route-target export auto\nip access-list protect\n  10 deny ip any any\nend\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan8": {
+            "addresses": [
+              "192.0.2.254/24"
+            ],
+            "acl_bindings": {},
+            "anycast": true,
+            "vrf": "tenant"
+          }
+        },
+        "vlan_vnis": {
+          "8": 10008
+        },
+        "vrfs": {
+          "tenant": {
+            "route_targets": [],
+            "routes": []
+          }
+        },
+        "nve": {
+          "members": {
+            "10008": {
+              "associate_vrf": false,
+              "replication": "bgp"
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {
+          "10008": {
+            "route_targets": [
+              {
+                "direction": "import",
+                "target": "auto",
+                "evpn": false
+              },
+              {
+                "direction": "export",
+                "target": "auto",
+                "evpn": false
+              }
+            ],
+            "routes": [],
+            "rd": "auto",
+            "type": "l2"
+          }
+        },
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {
+          "protect": [
+            {
+              "sequence": 10,
+              "action": "deny",
+              "expression": "ip any any"
+            }
+          ]
+        },
+        "address_groups": {},
+        "static_routes": [],
+        "anycast_mac": "0001.0001.0001",
+        "segments": [
+          {
+            "vlan_id": 8,
+            "vni": 10008,
+            "vrf": "tenant",
+            "prefix": "192.0.2.0/24",
+            "gateway": "192.0.2.254",
+            "anycast": true,
+            "acl_bindings": {}
+          }
+        ],
+        "config_digest": "cb5c2a7299e7f2cef75843e4114d157c32fd7579edb72450c715d31397e0f2f1",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

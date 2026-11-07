@@ -1,0 +1,118 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  template peer BASE\n    remote-as 65100\n  template peer CHILD\n    inherit peer BASE\n    remote-as 65200\n    address-family ipv4 unicast\n      route-map POLICY in\n  neighbor 192.0.2.1\n    inherit peer CHILD\n  neighbor 192.0.2.2\n    remote-as 65300\nroute-map POLICY permit 10\n  match ip address prefix-list LIST\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "inherit_peer": "CHILD"
+            },
+            "192.0.2.2": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65300"
+            }
+          },
+          "templates": {
+            "BASE": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65100"
+            },
+            "CHILD": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv4 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "route_maps": {
+                    "in": "POLICY"
+                  }
+                }
+              },
+              "redistribute": [],
+              "inherit_peer": "BASE",
+              "remote_as": "65200"
+            }
+          },
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "POLICY": [
+            {
+              "prefix_lists": [
+                "LIST"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "LIST"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "f2c1ab2491838662d380900ae78f366bca4c5f3ed76f327d03c173e5ae9f8b5d",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "unsupported_peer_inheritance"
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvpc domain 1\n  peer-switch\nvpc domain 2\n  peer-gateway\nvpc domain 1\n  peer-switch\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "9eee6e15c52630946a8013dd34e8b35a77cea4eb0bd240a4620a16e829efbd4e",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_vpc_domain",
+        "line": 4
+      },
+      {
+        "code": "duplicate_vpc_domain",
+        "line": 6
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

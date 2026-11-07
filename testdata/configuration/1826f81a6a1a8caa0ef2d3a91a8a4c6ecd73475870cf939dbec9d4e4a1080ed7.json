@@ -1,0 +1,81 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65000\n  address-family ipv4 unicast\n    network 192.0.2.0/24\n  vrf BLUE\n    address-family ipv6 unicast\n      network 2001:db8::/32\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {
+            "BLUE": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {
+                "ipv6 unicast": {
+                  "vrfs": {},
+                  "neighbors": {},
+                  "templates": {},
+                  "address_families": {},
+                  "redistribute": [],
+                  "networks": [
+                    {
+                      "prefix": "2001:db8::/32"
+                    }
+                  ]
+                }
+              },
+              "redistribute": []
+            }
+          },
+          "neighbors": {},
+          "templates": {},
+          "address_families": {
+            "ipv4 unicast": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "networks": [
+                {
+                  "prefix": "192.0.2.0/24"
+                }
+              ]
+            }
+          },
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "b53401a16cd384ee829f7cf5426edd3dcf4b09ac2e0f6d358b1245282acc7bb9",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

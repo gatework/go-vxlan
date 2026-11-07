@@ -1,0 +1,1 @@
+{"name":"acl_rules","input":{"entries":[{"sequence":10,"action":"deny","expression":"ip addrgroup admins any"},{"sequence":0,"action":"permit","expression":"ip any any"}]},"expected":null,"error":null}

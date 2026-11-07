@@ -1,0 +1,98 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nip prefix-list GLOBAL seq 10 permit 192.0.2.0/24\nroute-map EXPORT_GLOBAL permit 10\n  match ip address prefix-list GLOBAL\nvrf context BLUE\n  address-family ipv4 unicast\n    export vrf default 100000 map EXPORT_GLOBAL allow-vpn\nvrf context GREEN\n  address-family ipv4 unicast\n    export vrf default map EXPORT_GLOBAL\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {
+          "BLUE": {
+            "route_targets": [],
+            "routes": [],
+            "exports": [
+              {
+                "vrf": "default",
+                "prefix_limit": 100000,
+                "route_map": "EXPORT_GLOBAL",
+                "allow_vpn": true,
+                "address_family": "ipv4 unicast"
+              }
+            ]
+          },
+          "GREEN": {
+            "route_targets": [],
+            "routes": [],
+            "exports": [
+              {
+                "vrf": "default",
+                "prefix_limit": null,
+                "route_map": "EXPORT_GLOBAL",
+                "allow_vpn": false,
+                "address_family": "ipv4 unicast"
+              }
+            ]
+          }
+        },
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "GLOBAL": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": null,
+              "le": null
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {},
+        "route_maps": {
+          "EXPORT_GLOBAL": [
+            {
+              "prefix_lists": [
+                "GLOBAL"
+              ],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "address",
+                  "names": [
+                    "GLOBAL"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "740ad4adf8d136026311597c43148c1df415d61fefb1926aa2af5d5c7f328104",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

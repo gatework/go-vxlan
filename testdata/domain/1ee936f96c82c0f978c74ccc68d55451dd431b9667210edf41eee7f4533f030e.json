@@ -1,0 +1,1 @@
+{"name":"route_targets","input":{"entries":[{"direction":"both","target":"auto"}],"asn":4200000001,"vni":10008},"expected":[[null,false,"export",["auto",4200000001,10008]],[null,false,"import",["auto",4200000001,10008]]],"error":null}

@@ -1,0 +1,50 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\ninterface breakout module 1 port 53 map 10g-4x\nno feature signature-verification\nfeature bgp\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [
+          "bgp"
+        ],
+        "disabled_features": [
+          "signature-verification"
+        ],
+        "breakouts": {
+          "1/53": {
+            "module_id": 1,
+            "port": 53,
+            "map": "10g-4x"
+          }
+        },
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "08096e3a42626044fe3b6cd41bb7bf16598138cb2f348b379298ede546d71c32",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

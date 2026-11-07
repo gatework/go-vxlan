@@ -1,0 +1,50 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nfeature ospf\nfeature bgp\nfeature ospf\ninterface Vlan10\n  description Users\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [
+          "bgp",
+          "ospf"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan10": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "description": "Users"
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "b401e37204bb19f2e732fed6d4808b6bdcb019eb30d926095df8aa3bce532ef8",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

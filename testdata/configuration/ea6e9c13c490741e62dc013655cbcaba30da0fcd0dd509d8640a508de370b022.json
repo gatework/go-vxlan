@@ -1,0 +1,49 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nbanner motd ^C\nfeature IMAGINARY\ninterface Ethernet1/99\n  ip address 192.0.2.1/24\n  ip router ospf FAKE area 0\n^C\nfeature bgp\ninterface Ethernet1/1\n  no shutdown\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [
+          "bgp"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "shutdown": false
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "32b436276b1ed607a82713a0b5e7162a61a0a56dbdfa43ef826a597e6e6231fc",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

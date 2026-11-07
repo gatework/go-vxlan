@@ -1,0 +1,51 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvlan 1,110,120-121\nvlan 110\n  name BLUE\n  vn-segment 10110\nvlan 120\n  name STORAGE\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {
+          "110": 10110,
+          "120": null
+        },
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "df80cfeb08229d7612b110ae0fc6ce14c340791572c303816157fe401ed88d38",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "vlan_vni_without_nve",
+            "vni": 10110,
+            "vlan_ids": [
+              110
+            ]
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

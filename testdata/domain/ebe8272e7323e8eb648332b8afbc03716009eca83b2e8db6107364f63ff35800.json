@@ -1,0 +1,1 @@
+{"name":"acl_policy","input":{"config":{},"entries":[{"sequence":10,"action":"deny","expression":"tcp any any portgroup web"},{"sequence":20,"action":"permit","expression":"tcp any any portgroup web"}]},"expected":null,"error":null}

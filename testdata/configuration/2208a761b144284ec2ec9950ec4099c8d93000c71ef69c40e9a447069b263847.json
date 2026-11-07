@@ -1,0 +1,97 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\ninterface Vlan110\n  vrf member BLUE\n  ip address 10.110.0.1/24\nrouter bgp 65000\n  neighbor 192.0.2.1\n    inherit peer SPINES\n  template peer SPINES\n    remote-as 65000\nvlan 110\n  vn-segment 10110\nfeature ospf\nfeature bgp\nfeature ospf\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [
+          "bgp",
+          "ospf"
+        ],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Vlan110": {
+            "addresses": [
+              "10.110.0.1/24"
+            ],
+            "acl_bindings": {},
+            "anycast": false,
+            "vrf": "BLUE"
+          }
+        },
+        "vlan_vnis": {
+          "110": 10110
+        },
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {
+          "vrfs": {},
+          "neighbors": {
+            "192.0.2.1": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "inherit_peer": "SPINES"
+            }
+          },
+          "templates": {
+            "SPINES": {
+              "vrfs": {},
+              "neighbors": {},
+              "templates": {},
+              "address_families": {},
+              "redistribute": [],
+              "remote_as": "65000"
+            }
+          },
+          "address_families": {},
+          "redistribute": [],
+          "asn": 65000
+        },
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [
+          {
+            "vlan_id": 110,
+            "vni": 10110,
+            "vrf": "BLUE",
+            "prefix": "10.110.0.0/24",
+            "gateway": "10.110.0.1",
+            "anycast": false,
+            "acl_bindings": {}
+          }
+        ],
+        "config_digest": "a5b499289c372f726f508983d7882b9588e55267f72ed5a22beaefc9eb2063fc",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "vlan_vni_without_nve",
+            "vni": 10110,
+            "vlan_ids": [
+              110
+            ]
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

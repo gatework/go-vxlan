@@ -1,0 +1,47 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF-01\nvpc domain 10\n  peer-gateway\n  fast-convergence\n",
+  "complete": true,
+  "expected": {
+    "name": "configuration",
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF-01",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": {
+          "peer_keepalive": {},
+          "virtual_peer_link": {},
+          "peer_gateway": true,
+          "peer_switch": false,
+          "layer3_peer_router": false,
+          "id": 10
+        },
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "c4c9d1771a393023351b4e62122fa35d7e7c762905d76599be292b22744debc8",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "evidence": []
+  }
+}

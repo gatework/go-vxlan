@@ -1,0 +1,65 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nvlan 110\n  vn-segment 10110\ninterface nve1\n  member vni 10120\n    ingress-replication protocol bgp\nnv overlay evpn\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {
+          "110": 10110
+        },
+        "vrfs": {},
+        "nve": {
+          "members": {
+            "10120": {
+              "associate_vrf": false,
+              "replication": "bgp"
+            }
+          },
+          "interface": "nve1"
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "nv_overlay_evpn": true,
+        "segments": [],
+        "config_digest": "6d459f800c8fd2cab25f7328f0ad4b2ecde235e71fd0e683632e6916ed9c67bc",
+        "review_status": "complete",
+        "review_findings": [
+          {
+            "code": "vlan_vni_without_nve",
+            "vni": 10110,
+            "vlan_ids": [
+              110
+            ]
+          },
+          {
+            "code": "nve_l2_without_evpn",
+            "vni": 10120
+          },
+          {
+            "code": "nve_l2_without_vlan",
+            "vni": 10120
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

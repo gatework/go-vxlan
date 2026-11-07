@@ -1,0 +1,93 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nip prefix-list SHARED seq 10 permit 192.0.2.0/24 ge 25 le 32\nipv6 prefix-list SHARED seq 10 permit 2001:db8::/32 ge 48 le 128\nroute-map FILTER permit 10\n  match ip next-hop prefix-list SHARED\n  match ip route-source prefix-list SHARED\n  match ipv6 address prefix-list SHARED\n",
+  "complete": true,
+  "expected": {
+    "status": "complete",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {},
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {
+          "SHARED": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "192.0.2.0/24",
+              "ge": 25,
+              "le": 32
+            }
+          ]
+        },
+        "ipv6_prefix_lists": {
+          "SHARED": [
+            {
+              "sequence": 10,
+              "action": "permit",
+              "prefix": "2001:db8::/32",
+              "ge": 48,
+              "le": 128
+            }
+          ]
+        },
+        "route_maps": {
+          "FILTER": [
+            {
+              "prefix_lists": [],
+              "additional_matches": [],
+              "sets": [],
+              "prefix_list_matches": [
+                {
+                  "address_family": "ipv4",
+                  "selector": "next-hop",
+                  "names": [
+                    "SHARED"
+                  ]
+                },
+                {
+                  "address_family": "ipv4",
+                  "selector": "route-source",
+                  "names": [
+                    "SHARED"
+                  ]
+                },
+                {
+                  "address_family": "ipv6",
+                  "selector": "address",
+                  "names": [
+                    "SHARED"
+                  ]
+                }
+              ],
+              "action": "permit",
+              "sequence": 10
+            }
+          ]
+        },
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "fe8af2ba76346c6baefbc09339a0b4ceb5962fdba02889d50a867b728bc41083",
+        "review_status": "complete",
+        "review_findings": []
+      }
+    ],
+    "issues": [],
+    "name": "configuration",
+    "evidence": []
+  }
+}

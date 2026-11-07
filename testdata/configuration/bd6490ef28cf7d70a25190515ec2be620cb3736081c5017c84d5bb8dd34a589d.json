@@ -1,0 +1,56 @@
+{
+  "name": "configuration",
+  "text": "hostname LEAF\nrouter bgp 65001\n  neighbor 192.0.2.2\n    remote-as 65200\nrouter bgp 65000\n  neighbor 192.0.2.1\n    remote-as 65100\nrouter bgp 65001\n  neighbor 192.0.2.2\n    remote-as 65200\ninterface Ethernet1/1\n  mtu 1500\n",
+  "complete": true,
+  "expected": {
+    "status": "partial",
+    "records": [
+      {
+        "hostname": "LEAF",
+        "features": [],
+        "disabled_features": [],
+        "breakouts": {},
+        "interfaces": {
+          "Ethernet1/1": {
+            "addresses": [],
+            "acl_bindings": {},
+            "anycast": false,
+            "mtu": 1500
+          }
+        },
+        "vlan_vnis": {},
+        "vrfs": {},
+        "nve": {
+          "members": {}
+        },
+        "evpn": {},
+        "bgp": {},
+        "ospf": {},
+        "vpc_domain": null,
+        "unnumbered_addresses": {},
+        "prefix_lists": {},
+        "ipv6_prefix_lists": {},
+        "route_maps": {},
+        "acls": {},
+        "address_groups": {},
+        "static_routes": [],
+        "segments": [],
+        "config_digest": "f3e91d93dd4b5348a9c7c6258cc955208f792af17936a019d4289691d329534e",
+        "review_status": "partial",
+        "review_findings": []
+      }
+    ],
+    "issues": [
+      {
+        "code": "duplicate_bgp_process",
+        "line": 5
+      },
+      {
+        "code": "duplicate_bgp_process",
+        "line": 8
+      }
+    ],
+    "name": "configuration",
+    "evidence": []
+  }
+}

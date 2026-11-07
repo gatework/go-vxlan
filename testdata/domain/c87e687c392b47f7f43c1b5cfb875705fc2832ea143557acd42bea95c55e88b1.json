@@ -1,0 +1,1 @@
+{"name":"scope","input":{"policy":{"fabrics":{"A":{"leaves":["2001:db8::1","2001:db8::2"]}}}},"expected":{"A":{"leaves":["2001:db8::1","2001:db8::2"],"borders":[],"spines":[]}},"error":null}

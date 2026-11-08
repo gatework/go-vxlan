@@ -26,13 +26,13 @@ func inventorySections(m vxlan.Record) vxlan.Record {
 	}
 	return out
 }
-func prepareInventory(c *Config, fileenv, process map[string]string, cwd, home string) error {
+func prepareInventory(ctx context.Context, c *Config, fileenv, process map[string]string, cwd, home string) error {
 	if c.Values["netdisco"] == nil && c.Values["inventory"] == nil && c.Values["netdisco_config"] == nil {
 		return nil
 	}
 	data := inventorySections(c.Values)
 	if p := record.String(c.Values["netdisco_config"]); p != "" {
-		m, e := ReadYAML(p)
+		m, e := ReadYAML(ctx, p)
 		if e != nil {
 			return e
 		}
@@ -71,41 +71,71 @@ func prepareInventory(c *Config, fileenv, process map[string]string, cwd, home s
 	}
 	return nil
 }
-func selectDevices(rows []any, values vxlan.Record) []any {
+
+type deviceFilter struct {
+	hosts, excludeHosts []netip.Prefix
+	names, excludeNames []string
+}
+
+func newDeviceFilter(values vxlan.Record) deviceFilter {
+	prefixes := func(key string) []netip.Prefix {
+		var out []netip.Prefix
+		for _, value := range record.Texts(values[key]) {
+			prefix, _ := addressPrefix(value) // validateConfig has checked each filter.
+			out = append(out, prefix)
+		}
+		return out
+	}
+	names := func(key string) []string {
+		out := record.Texts(values[key])
+		for i := range out {
+			out[i] = strings.ToLower(out[i])
+		}
+		return out
+	}
+	return deviceFilter{prefixes("hosts"), prefixes("exclude_hosts"), names("names"), names("exclude_names")}
+}
+
+func (f deviceFilter) selectDevices(rows []any) []any {
 	out := []any{}
 	for _, row := range rows {
 		r := record.Map(row)
 		ip, _ := netip.ParseAddr(record.String(r["host"]))
-		matchIP := func(k string, empty bool) bool {
-			vs := record.Texts(values[k])
-			if len(vs) == 0 {
+		matchIP := func(prefixes []netip.Prefix, empty bool) bool {
+			if len(prefixes) == 0 {
 				return empty
 			}
-			for _, v := range vs {
-				p, e := addressPrefix(v)
-				if e == nil && p.Contains(ip) {
+			for _, prefix := range prefixes {
+				if prefix.Contains(ip) {
 					return true
 				}
 			}
 			return false
 		}
-		matchName := func(k string, empty bool) bool {
-			vs := record.Texts(values[k])
-			if len(vs) == 0 {
+		name := strings.ToLower(record.String(r["name"]))
+		matchName := func(patterns []string, empty bool) bool {
+			if len(patterns) == 0 {
 				return empty
 			}
-			for _, v := range vs {
-				if strings.Contains(strings.ToLower(record.String(r["name"])), strings.ToLower(v)) {
+			for _, pattern := range patterns {
+				if strings.Contains(name, pattern) {
 					return true
 				}
 			}
 			return false
 		}
-		if matchIP("hosts", true) && !matchIP("exclude_hosts", false) && matchName("names", true) && !matchName("exclude_names", false) {
-			out = append(out, r)
+		if matchIP(f.hosts, true) && !matchIP(f.excludeHosts, false) && matchName(f.names, true) && !matchName(f.excludeNames, false) {
+			out = append(out, record.Copy(r))
 		}
 	}
 	return out
+}
+
+type inventorySettings struct {
+	devices []any
+	filter  deviceFilter
+	rules   *fleet.Rules
+	fetch   func(context.Context) (netdisco.CacheResult, error)
 }
 
 type InventoryResult struct {
@@ -113,11 +143,13 @@ type InventoryResult struct {
 	Cache   netdisco.CacheResult
 }
 
-func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
-	var fetched InventoryResult
+func inventorySettingsFor(c Config) (inventorySettings, error) {
+	settings := inventorySettings{
+		devices: record.List(record.Copy(c.Values["devices"])),
+		filter:  newDeviceFilter(c.Values),
+	}
 	if c.Inventory == nil {
-		fetched.Devices = selectDevices(record.List(c.Values["devices"]), c.Values)
-		return fetched, nil
+		return settings, nil
 	}
 	nd := record.Map(c.Inventory["netdisco"])
 	inv := record.Map(c.Inventory["inventory"])
@@ -133,7 +165,7 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 	for _, value := range record.List(inv["device_rules"]) {
 		m, ok := value.(map[string]any)
 		if !ok {
-			return fetched, fmt.Errorf("invalid device rule")
+			return settings, fmt.Errorf("invalid device rule")
 		}
 		rule := fleet.Mapping{}
 		for k, v := range m {
@@ -142,7 +174,7 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 			}
 			text, ok := v.(string)
 			if !ok {
-				return fetched, fmt.Errorf("invalid device rule")
+				return settings, fmt.Errorf("invalid device rule")
 			}
 			switch k {
 			case "vendor":
@@ -154,14 +186,14 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 			case "model_prefix":
 				rule.ModelPrefix = &text
 			default:
-				return fetched, fmt.Errorf("unknown device rule field")
+				return settings, fmt.Errorf("unknown device rule field")
 			}
 		}
 		ruleOptions.Mappings = append(ruleOptions.Mappings, rule)
 	}
 	rules, e := fleet.NewRules(ruleOptions, vendors.NewBuiltinRegistry())
 	if e != nil {
-		return fetched, e
+		return settings, e
 	}
 	get := func(k, def string) string {
 		if v := record.String(nd[k]); v != "" {
@@ -182,10 +214,14 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 		ttl := time.Duration(num("cache_ttl", 72*3600)) * time.Second
 		options.Cache = &netdisco.CachePolicy{Directory: get("cache_directory", ""), Namespace: get("cache_namespace", ""), TTL: &ttl}
 	}
+	settings.rules = rules
 	env := c.Environment
 	switch get("source", "http") {
 	case "http":
-		fetched.Cache, e = netdisco.FetchHTTP(ctx, netdisco.HTTPOptions{URL: get("url", ""), Username: env["ND_USERNAME"], Password: env["ND_PASSWORD"], APIKey: env["ND_API_KEY"], RequireHTTPS: nd["allow_insecure_http"] != true, Limits: limits}, options)
+		source := netdisco.HTTPOptions{URL: get("url", ""), Username: env["ND_USERNAME"], Password: env["ND_PASSWORD"], APIKey: env["ND_API_KEY"], RequireHTTPS: nd["allow_insecure_http"] != true, Limits: limits}
+		settings.fetch = func(ctx context.Context) (netdisco.CacheResult, error) {
+			return netdisco.FetchHTTP(ctx, source, options)
+		}
 	case "postgres":
 		dsn := []string{}
 		quote := func(value string) string {
@@ -194,7 +230,7 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 		for _, pair := range [][2]string{{"host", "ND_DB_HOST"}, {"dbname", "ND_DB_NAME"}, {"user", "ND_DB_USER"}} {
 			value := env[pair[1]]
 			if value == "" {
-				return fetched, fmt.Errorf("Netdisco 数据库凭据缺失")
+				return settings, fmt.Errorf("Netdisco 数据库凭据缺失")
 			}
 			dsn = append(dsn, pair[0]+"="+quote(value))
 		}
@@ -206,17 +242,38 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 		if mode != "only" {
 			dsn = append(dsn, "password="+quote(env["ND_DB_PASS"]))
 		}
-		fetched.Cache, e = netdisco.FetchPostgres(ctx, netdisco.PostgresOptions{Connection: strings.Join(dsn, " "), Query: get("query", ""), Parameters: record.List(nd["query_params"]), Limits: limits}, options)
+		source := netdisco.PostgresOptions{Connection: strings.Join(dsn, " "), Query: get("query", ""), Parameters: record.List(record.Copy(nd["query_params"])), Limits: limits}
+		settings.fetch = func(ctx context.Context) (netdisco.CacheResult, error) {
+			return netdisco.FetchPostgres(ctx, source, options)
+		}
 	default:
-		return fetched, fmt.Errorf("Netdisco source 无效")
+		return settings, fmt.Errorf("Netdisco source 无效")
 	}
+	return settings, nil
+}
+
+func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
+	var fetched InventoryResult
+	if err := ctx.Err(); err != nil {
+		return fetched, err
+	}
+	if c.runtime.inventoryError != nil {
+		return fetched, c.runtime.inventoryError
+	}
+	settings := c.runtime.inventory
+	if settings.fetch == nil {
+		fetched.Devices = settings.filter.selectDevices(settings.devices)
+		return fetched, nil
+	}
+	var e error
+	fetched.Cache, e = settings.fetch(ctx)
 	if e != nil {
 		return fetched, e
 	}
 
 	out := []any{}
 	for _, r := range fetched.Cache.Rows {
-		v := rules.Record(r)
+		v := settings.rules.Record(r)
 		if v.Issue == "" && v.Vendor == "cisco_nxos" {
 			name := v.Name
 			if name == "" {
@@ -229,6 +286,6 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 	if e != nil {
 		return fetched, e
 	}
-	fetched.Devices = selectDevices(out, c.Values)
+	fetched.Devices = settings.filter.selectDevices(out)
 	return fetched, nil
 }

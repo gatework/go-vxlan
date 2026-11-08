@@ -2,7 +2,7 @@
 
 Cisco NX-OS VXLAN/EVPN 配置与运行态采集、证据解析、Fabric 审查和受控增量变更。参考 Ruby VXLAN `3c7b855` 实现，运行时不需要 Ruby。
 
-支持 Go 1.26 及以上，Linux/macOS amd64/arm64。当前版本 `v0.2.0`，固定使用正式依赖 `go-net-connector v0.4.0` 与 `go-expect v0.4.1`，通过 `GOWORK=off` 独立构建。公开业务包路径有所调整，升级前阅读 [API 迁移](docs/api-migration.md)；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
+支持 Go 1.26 及以上，Linux/macOS amd64/arm64。当前版本 [v0.3.0](docs/releases/v0.3.0.md)，固定使用正式依赖 `go-net-connector v0.5.0` 与 `go-expect v0.4.2`，通过 `GOWORK=off` 独立构建。Fabric 审查的公开查询接口有所调整，升级前阅读 [API 迁移](docs/api-migration.md)；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
 
 ```sh
 GOWORK=off go test -mod=readonly ./...
@@ -10,7 +10,7 @@ GOWORK=off go build -mod=readonly -o bin/vxlan ./cmd/vxlan
 ./bin/vxlan --help
 ```
 
-当前联合验证使用任务 go.work，不设置 go.mod replace，也不恢复历史 `.work/`。旧依赖快照的来源记录见 [dependencies/README.md](dependencies/README.md)；接口迁移见 [迁移说明](docs/api-migration.md)。
+依赖由 `go.mod/go.sum` 管理，无需本地依赖副本或 workspace 重建步骤。接口迁移见 [迁移说明](docs/api-migration.md)。
 
 ## CLI
 
@@ -75,13 +75,13 @@ captures := document.CapturesFor("interfaces", "Vlan10")
 
 `NewEvidenceDocument` 将原生 Snapshot 与离线 `DecodeDocument` 输出投影到相同的已校验证据；`ProjectRecord` 拒绝循环、非有限数值、不可投影类型，保留精确数字与 null/空容器区别。`Fingerprint` 现在返回 `(string, error)`；无效值没有摘要。`change.NewExecutionPlan` 持有选中条目的原始文件摘要、设备、预期配置摘要和重渲染命令，`ChangePlan` 仍表示独立业务增量。
 
-`review.ReviewFabric`、`review.Recommendations`、`configuration.ServiceCatalog` 和 `change.NewChangePlan` 提供领域能力；变更包含 `svi_acl`、`svi_gateway_add`、`vlan_vni_add` 三类。公开观察对象由调用者持有，可修改；构造、解析和计划访问器复制输入或输出，避免跨调用共享。`ConfigurationParser` 实例不支持并发调用，使用独立实例。
+`review.ReviewFabric(documents, policy, profile)`、`review.Recommendations`、`configuration.ServiceCatalog` 和 `change.NewChangePlan` 提供领域能力；变更包含 `svi_acl`、`svi_gateway_add`、`vlan_vni_add` 三类。Fabric 验证命令取自 Profile 的 `VerificationCommands("fabric")`，缺失时保留诊断并阻止生成可执行变更。公开观察对象由调用者持有，可修改；构造、解析和计划访问器复制输入或输出，避免跨调用共享。`ConfigurationParser` 实例不支持并发调用，使用独立实例。
 
 包职责、导入方向和扩展方式见 [架构说明](docs/architecture.md)；公共 Go API 路径调整见 [迁移说明](docs/api-migration.md)。CLI 实现在 `internal/cli`，库消费者直接使用业务包。
 
 ## 验证
 
-当前候选联合验证使用任务 go.work 和 `GOFLAGS=-mod=readonly`；以下独立消费者及发行门禁须在共享 Fetch 正式发布、更新依赖版本后执行，不能用本地联编替代。
+以下检查使用 `GOWORK=off` 和 `GOFLAGS=-mod=readonly`，Connector/Expect 均从正式版本解析。源码消费者与发行版本的检查范围见 [验证说明](docs/verification.md)。
 
 ```sh
 GOWORK=off go test -mod=readonly -race ./...

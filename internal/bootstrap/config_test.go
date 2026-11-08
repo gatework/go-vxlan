@@ -13,7 +13,7 @@ func TestConfigLayers(t *testing.T) {
 	d := t.TempDir()
 	os.WriteFile(filepath.Join(d, ".env"), []byte("VXLAN_PARALLEL=2\nNC_DEVICE_PASSWORD='private#value'\n"), 0600)
 	os.WriteFile(filepath.Join(d, "vxlan.yml"), []byte("parallel: 3\ndirectory: reports\ndevices:\n  - host: 192.0.2.1\n"), 0600)
-	cfg, e := Load(ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{"VXLAN_PARALLEL": "5"}, Overrides: map[string]any{"parallel": 7}})
+	cfg, e := Load(t.Context(), ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{"VXLAN_PARALLEL": "5"}, Overrides: map[string]any{"parallel": 7}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -25,11 +25,11 @@ func TestConfigLayers(t *testing.T) {
 	}
 }
 func TestConfigStrict(t *testing.T) {
-	for _, body := range []string{"parallel: 2\nparallel: 3\n", "devices: &x []\ndimensions: *x\n", "devices: []\n---\nparallel: 2\n", "password: secret\n", "ssh:\n  password: secret\n", "devices:\n - host: 192.0.2.1\n - host: 192.0.2.1\n"} {
+	for _, body := range []string{"", "# comment only\n", "null\n", "~\n", "---\n", "parallel: 2\nparallel: 3\n", "devices: &x []\ndimensions: *x\n", "devices: []\n---\nparallel: 2\n", "password: secret\n", "ssh:\n  password: secret\n", "devices:\n - host: 192.0.2.1\n - host: 192.0.2.1\n"} {
 		t.Run(body, func(t *testing.T) {
 			d := t.TempDir()
 			os.WriteFile(filepath.Join(d, "vxlan.yml"), []byte(body), 0600)
-			_, e := Load(ConfigOptions{CWD: d, Home: d, Directories: []string{d}})
+			_, e := Load(t.Context(), ConfigOptions{CWD: d, Home: d, Directories: []string{d}})
 			if e == nil {
 				t.Fatal("invalid configuration accepted")
 			}
@@ -62,7 +62,7 @@ func TestInventoryHigherLayersMaskMalformedDefaults(t *testing.T) {
 			if process == nil {
 				process = map[string]string{}
 			}
-			c, e := Load(ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: process})
+			c, e := Load(t.Context(), ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: process})
 			if tc.wantError {
 				if e == nil {
 					t.Fatal("effective invalid value accepted")
@@ -96,7 +96,7 @@ func TestInventoryDefaultsAndSourceRelativePaths(t *testing.T) {
 	if e := os.WriteFile(filepath.Join(configDir, "vxlan.yml"), []byte("netdisco: {}\n"), 0600); e != nil {
 		t.Fatal(e)
 	}
-	c, e := Load(ConfigOptions{CWD: d, Home: d, Directories: []string{configDir}, Environment: map[string]string{}})
+	c, e := Load(t.Context(), ConfigOptions{CWD: d, Home: d, Directories: []string{configDir}, Environment: map[string]string{}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -118,7 +118,7 @@ func TestExternalInventoryKeepsFlatBackupSection(t *testing.T) {
 		if e := os.WriteFile(filepath.Join(d, "vxlan.yml"), []byte("netdisco_config: backup.yml\n"), 0600); e != nil {
 			t.Fatal(e)
 		}
-		c, e := Load(ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{}})
+		c, e := Load(t.Context(), ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{}})
 		if e != nil {
 			t.Fatal(e)
 		}

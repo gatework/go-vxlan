@@ -52,37 +52,28 @@ func (s Session) Read(ctx context.Context, command string) (capture collect.Capt
 	}
 	// An accepted step survives later hooks, logging and cancellation errors.
 	// A matched prompt in Attempts alone does not establish acceptance.
-	steps := result.Steps()
-	if len(steps) != 1 || steps[0].Command().Text != command {
+	step, receiptErr := result.SingleAccepted(command)
+	if receiptErr != nil {
 		if err == nil {
-			err = errors.New("invalid command result")
+			err = receiptErr
 		}
 		return capture, err
 	}
-	response := steps[0].Response()
-	rendered, renderErr := response.Rendered()
-	promptText, promptErr := response.Prompt()
-	if textErr := errors.Join(renderErr, promptErr); textErr != nil {
+	body, bodyErr := step.Body()
+	promptText, promptErr := step.Response().Prompt()
+	if textErr := errors.Join(bodyErr, promptErr); textErr != nil {
 		return capture, errors.Join(err, textErr)
 	}
-	capture.Body = commandBody(rendered, promptText, command)
+	// VXLAN historically removed the entire matched prompt, including its
+	// leading newlines. Connector Body preserves those separators for consumers.
+	for range len(promptText) - len(strings.TrimLeft(promptText, "\n")) {
+		body = strings.TrimSuffix(body, "\n")
+	}
+	capture.Body = body
 	capture.Complete = true
 	return capture, err
 }
 
-// Strip only the acknowledged prompt and matching first echo line. Rendering
-// applies terminal edits; it must not erase unknown configuration syntax.
-func commandBody(output, prompt, command string) string {
-	body := strings.TrimSuffix(output, prompt)
-	first, rest, hasNewline := strings.Cut(body, "\n")
-	if strings.TrimSpace(first) == strings.TrimSpace(command) {
-		if hasNewline {
-			return rest
-		}
-		return ""
-	}
-	return body
-}
 func (s Session) Write(ctx context.Context, command string) error {
 	if s.Operation == nil {
 		return sessionError{fmt.Errorf("missing operation")}
@@ -91,8 +82,8 @@ func (s Session) Write(ctx context.Context, command string) error {
 	if e != nil {
 		return sessionError{e}
 	}
-	if steps := result.Steps(); len(steps) != 1 || steps[0].Command().Text != command {
-		return sessionError{fmt.Errorf("invalid write receipt")}
+	if _, err := result.SingleAccepted(command); err != nil {
+		return sessionError{err}
 	}
 	return nil
 }

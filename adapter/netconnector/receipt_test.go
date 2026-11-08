@@ -97,6 +97,42 @@ type codedHookError struct{ error }
 
 func (codedHookError) FailureCode() string { return "private_hook_code" }
 
+func TestReadPreservesBodyFraming(t *testing.T) {
+	platform, err := ncvendors.NewBuiltinRegistry().Lookup("cisco_nxos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, wire, want string
+	}{
+		{"echo_and_indent", receiptCommand + "\r\n  hostname LEAF\r\nleaf#", "  hostname LEAF"},
+		{"without_echo", "  hostname LEAF\r\nleaf#", "  hostname LEAF"},
+		{"blank_lines", receiptCommand + "\r\n\r\n  hostname LEAF\r\n\r\nleaf#", "\n  hostname LEAF\n"},
+		{"echo_only", receiptCommand + "\r\nleaf#", ""},
+		{"repeated_command", receiptCommand + "\r\n" + receiptCommand + "\r\nleaf#", receiptCommand},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			device := readDevice(t, platform.Profile(), func(peer net.Conn) error {
+				if _, err := io.WriteString(peer, test.wire); err != nil {
+					return err
+				}
+				_, err := io.Copy(io.Discard, peer)
+				return err
+			})
+			err := device.WithOperation(t.Context(), func(ctx context.Context, op *connector.Operation) error {
+				capture, err := (Session{Operation: op, Device: device}).Read(ctx, receiptCommand)
+				if err == nil && (!capture.Complete || capture.Body != test.want) {
+					t.Errorf("capture body = %q, complete = %t; want %q", capture.Body, capture.Complete, test.want)
+				}
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestConfigurationReadStopsAfterAcceptedBodyWithError(t *testing.T) {
 	cause := errors.New("post-acceptance failure")
 	commands := []string{}

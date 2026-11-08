@@ -31,6 +31,7 @@ jobs:
       - run: go mod verify
       - run: go mod tidy -diff
       - run: python3 scripts/check-architecture.py
+      - run: python3 scripts/test_architecture.py
       - run: go vet ./...
       - run: go test -race -count=1 -timeout=180s ./...
       - if: matrix.go == '1.27.3'

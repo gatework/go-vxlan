@@ -32,7 +32,13 @@ func runtimeParser(dimension string) parser.ParseFunc {
 
 // ProfileSpec returns owned declarations for NX-OS evidence collection.
 func ProfileSpec() parser.ProfileSpec {
-	return parser.ProfileSpec{Queries: querySpecs(), Preparation: []string{"terminal length 0", "terminal width 511"}, AbsentReason: absentReason}
+	return parser.ProfileSpec{
+		Queries: querySpecs(),
+		Verification: map[string][]string{
+			"fabric": {"show running-config", "show nve vni", "show ip interface brief vrf all"},
+		},
+		Preparation: []string{"terminal length 0", "terminal width 511"}, AbsentReason: absentReason,
+	}
 }
 
 // DimensionNames returns the default collection order.

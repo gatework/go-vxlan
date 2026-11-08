@@ -31,12 +31,24 @@ func (a *App) apply(ctx context.Context, f *pflag.FlagSet) int {
 		return a.fail(fmt.Errorf("需要有效 --plan 和 --item"))
 	}
 	path := bootstrap.Absolute(flagString(f, "plan"), a.CWD, a.Home)
+	if err := ctx.Err(); err != nil {
+		return a.fail(err)
+	}
 	body, e := os.ReadFile(path)
+	if err := ctx.Err(); err != nil {
+		return a.fail(err)
+	}
 	if e != nil {
 		return a.fail(fmt.Errorf("计划无法读取"))
 	}
 	hash := fmt.Sprintf("%x", sha256.Sum256(body))
+	if err := ctx.Err(); err != nil {
+		return a.fail(err)
+	}
 	checksum, e := os.ReadFile(path + ".sha256")
+	if err := ctx.Err(); err != nil {
+		return a.fail(err)
+	}
 	if e != nil || strings.TrimSpace(string(checksum)) != hash {
 		return a.fail(fmt.Errorf("计划校验失败"))
 	}
@@ -54,7 +66,7 @@ func (a *App) apply(ctx context.Context, f *pflag.FlagSet) int {
 		fmt.Fprintln(a.Output, "已取消，未连接设备。")
 		return 1
 	}
-	cfg, e := bootstrap.Load(bootstrap.ConfigOptions{CWD: a.CWD, Home: a.Home, Program: a.Program, Directories: a.Directories, Environment: a.Environment, EnvFile: flagString(f, "env-file"), AllowMissing: true, EnvironmentOnly: true})
+	cfg, e := bootstrap.Load(ctx, bootstrap.ConfigOptions{CWD: a.CWD, Home: a.Home, Program: a.Program, Directories: a.Directories, Environment: a.Environment, EnvFile: flagString(f, "env-file"), AllowMissing: true, EnvironmentOnly: true})
 	if e != nil {
 		return a.fail(fmt.Errorf("凭据配置无法读取"))
 	}

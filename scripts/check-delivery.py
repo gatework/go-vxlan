@@ -9,8 +9,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEPENDENCIES = {
-    "github.com/gatework/go-net-connector": "v0.4.0",
-    "github.com/gatework/go-expect": "v0.4.1",
+    "github.com/gatework/go-net-connector": "v0.5.0",
+    "github.com/gatework/go-expect": "v0.4.2",
 }
 
 
@@ -33,6 +33,7 @@ def main():
     if module.get("Replace"):
         raise RuntimeError("candidate go.mod must not contain replacements")
     run(["python3", "scripts/check-architecture.py"], ROOT)
+    run(["python3", "scripts/test_architecture.py"], ROOT)
     verify_dependencies(ROOT)
     run(["go", "mod", "verify"], ROOT)
     run(["go", "mod", "tidy", "-diff"], ROOT)
@@ -44,7 +45,7 @@ def main():
             ROOT,
             isolated,
             ignore=shutil.ignore_patterns(
-                ".git", ".work", ".superpowers", "bin", "go.work", "go.work.sum",
+                ".git", ".work", ".superpowers", "bin", "dist", "go.work", "go.work.sum",
                 ".env", "vxlans", "vxlan-executions", "__pycache__",
             ),
         )

@@ -11,6 +11,7 @@ import (
 	"github.com/gatework/go-vxlan/configuration"
 	recordpkg "github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/vendors"
 )
 
 func TestChangePlanOwnsInputsAndAccessorResults(t *testing.T) {
@@ -98,7 +99,7 @@ func TestSubnetIndexRetainsItsSnapshot(t *testing.T) {
 func TestFabricRejectsDuplicateIdentity(t *testing.T) {
 	doc := vxlan.Record{"device": vxlan.Record{"host": "192.0.2.1"}}
 	policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
-	if _, err := review.ReviewFabric([]vxlan.Record{doc, doc}, policy); err == nil || !strings.Contains(err.Error(), "重复设备身份") {
+	if _, err := review.ReviewFabric([]vxlan.Record{doc, doc}, policy, nil); err == nil || !strings.Contains(err.Error(), "重复设备身份") {
 		t.Fatal("duplicate identity must fail", err)
 	}
 }
@@ -131,6 +132,10 @@ func TestSubnetIndexQueryAllocationGrowth(t *testing.T) {
 }
 
 func TestFabricGatewayAllocationGrowth(t *testing.T) {
+	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	allocations := []float64{}
 	for _, count := range []int{32, 128} {
 		docs := []vxlan.Record{}
@@ -151,7 +156,7 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 		}
 		policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
 		allocations = append(allocations, testing.AllocsPerRun(1, func() {
-			audit, err := review.ReviewFabric(docs, policy)
+			audit, err := review.ReviewFabric(docs, policy, profile)
 			if err != nil || len(recordpkg.Rows(recordpkg.Map(audit["device_items"])["192.0.2.2"])) != count {
 				t.Fatal("gateway audit failed", err)
 			}
@@ -160,5 +165,49 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 	t.Logf("fabric gateway allocations for 32/128 VNIs: %v", allocations)
 	if allocations[1] >= allocations[0]*6 {
 		t.Fatalf("fabric gateway allocations grow quadratically: %v", allocations)
+	}
+}
+
+func TestFabricGatewayConflictsRemainScopedAndOwned(t *testing.T) {
+	configs, documents, policy := benchmarkFabric(4, 1)
+	for _, host := range []string{"192.0.2.3", "192.0.2.4"} {
+		svi := recordpkg.Map(recordpkg.At(configs, host, "interfaces", "Vlan1"))
+		svi["addresses"], svi["vrf"] = []string{}, "other"
+	}
+	first := recordpkg.Map(configs["192.0.2.1"])
+	recordpkg.Map(first["interfaces"])["Vlan999"] = vxlan.Record{"vrf": "other", "addresses": []string{"10.0.0.1/24"}}
+	recordpkg.Map(first["vlan_vnis"])["999"] = 10999
+	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	audit, err := review.ReviewFabric(documents, policy, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var conflicts []vxlan.Record
+	for _, host := range []string{"192.0.2.2", "192.0.2.3", "192.0.2.4"} {
+		found := 0
+		for _, item := range recordpkg.Rows(recordpkg.Map(audit["device_items"])[host]) {
+			if item["code"] != "fabric_gateway" {
+				continue
+			}
+			for _, evidence := range recordpkg.Rows(item["evidence"]) {
+				if evidence["interface"] == "Vlan999" {
+					found++
+					conflicts = append(conflicts, evidence)
+				}
+			}
+		}
+		if host == "192.0.2.2" && found != 0 || host != "192.0.2.2" && found != 1 {
+			t.Fatalf("gateway conflicts crossed VRF boundary for %s: %d", host, found)
+		}
+	}
+	if len(conflicts) != 2 {
+		t.Fatalf("missing independent conflict evidence: %d", len(conflicts))
+	}
+	recordpkg.StringSlice(conflicts[0]["value"])[0] = "changed"
+	if recordpkg.StringSlice(conflicts[1]["value"])[0] != "10.0.0.1/24" {
+		t.Fatal("cached query shared mutable evidence between recommendations")
 	}
 }

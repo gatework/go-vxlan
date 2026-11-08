@@ -1,9 +1,8 @@
 package bootstrap
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"math"
 	"net/netip"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/vendors/nxos"
-	"go.yaml.in/yaml/v3"
 )
 
 type ConfigOptions struct {
@@ -53,53 +51,16 @@ func Absolute(p, base, home string) string {
 	}
 	return filepath.Join(base, p)
 }
-func ReadYAML(path string) (vxlan.Record, error) {
-	b, e := os.ReadFile(path)
+func ReadYAML(ctx context.Context, path string) (vxlan.Record, error) {
+	b, _, e := ncconfig.ReadFile(ctx, path, false)
 	if e != nil {
 		return nil, e
 	}
-	return parseYAML(b)
-}
-func parseYAML(b []byte) (vxlan.Record, error) {
-	dec := yaml.NewDecoder(bytes.NewReader(b))
-	var root yaml.Node
-	if e := dec.Decode(&root); e != nil {
-		return nil, fmt.Errorf("YAML 无效")
+	document, err := ncconfig.ParseYAMLMapping(b)
+	if canceled := ctx.Err(); canceled != nil {
+		return nil, canceled
 	}
-	var extra yaml.Node
-	if e := dec.Decode(&extra); e != io.EOF {
-		return nil, fmt.Errorf("YAML 禁止多文档")
-	}
-	var check func(*yaml.Node) error
-	check = func(n *yaml.Node) error {
-		if n.Kind == yaml.AliasNode || n.Anchor != "" {
-			return fmt.Errorf("YAML 禁止别名")
-		}
-		if n.Kind == yaml.MappingNode {
-			seen := map[string]bool{}
-			for i := 0; i < len(n.Content); i += 2 {
-				k := n.Content[i]
-				if k.Tag != "!!str" || seen[k.Value] {
-					return fmt.Errorf("YAML 键重复或不是字符串")
-				}
-				seen[k.Value] = true
-			}
-		}
-		for _, c := range n.Content {
-			if e := check(c); e != nil {
-				return e
-			}
-		}
-		return nil
-	}
-	if e := check(&root); e != nil {
-		return nil, e
-	}
-	var m vxlan.Record
-	if e := root.Decode(&m); e != nil || m == nil {
-		return nil, fmt.Errorf("YAML 须为映射")
-	}
-	return m, nil
+	return document, err
 }
 
 var configPaths = map[string]bool{"directory": true, "fabric_policy": true, "netdisco_config": true, "ssh.known_hosts": true, "netdisco.cache_directory": true, "netdisco.db_sslrootcert": true}
@@ -150,8 +111,11 @@ func envValues(env map[string]string) vxlan.Record {
 	}
 	return m
 }
-func Load(o ConfigOptions) (Config, error) {
+func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 	c := Config{Environment: map[string]string{}, Sources: vxlan.Record{}}
+	if err := ctx.Err(); err != nil {
+		return c, err
+	}
 	if o.CWD == "" {
 		o.CWD, _ = os.Getwd()
 	}
@@ -194,14 +158,11 @@ func Load(o ConfigOptions) (Config, error) {
 	fileenv := map[string]string{}
 	envFiles := []string{}
 	loadEnv := func(p string, explicit bool) error {
-		body, e := os.ReadFile(p)
-		var m map[string]string
-		if e == nil {
-			m, e = ncconfig.ParseEnvironment(string(body), fileenv, process)
+		body, found, e := ncconfig.ReadFile(ctx, p, !explicit || o.AllowMissing)
+		if e != nil || !found {
+			return e
 		}
-		if os.IsNotExist(e) && (!explicit || o.AllowMissing) {
-			return nil
-		}
+		m, e := ncconfig.ParseEnvironment(string(body), fileenv, process)
 		if e != nil {
 			return e
 		}
@@ -255,10 +216,11 @@ func Load(o ConfigOptions) (Config, error) {
 	files := []string{}
 	fields := map[string]string{}
 	load := func(p string, required bool) error {
-		m, e := ReadYAML(p)
-		if os.IsNotExist(e) && (!required || o.AllowMissing) {
-			return nil
+		body, found, e := ncconfig.ReadFile(ctx, p, !required || o.AllowMissing)
+		if e != nil || !found {
+			return e
 		}
+		m, e := ncconfig.ParseYAMLMapping(body)
 		if e != nil {
 			return e
 		}
@@ -342,9 +304,8 @@ func Load(o ConfigOptions) (Config, error) {
 	if e := validateConfig(c.Values); e != nil {
 		return c, e
 	}
-	c.runtime = runtimeSettings(c.Values)
 	if p := record.String(c.Values["fabric_policy"]); p != "" {
-		m, e := ReadYAML(p)
+		m, e := ReadYAML(ctx, p)
 		if e != nil {
 			return c, e
 		}
@@ -353,8 +314,15 @@ func Load(o ConfigOptions) (Config, error) {
 		}
 		c.Policy = m
 	}
-	if e := prepareInventory(&c, fileenv, process, o.CWD, o.Home); e != nil {
+	if e := prepareInventory(ctx, &c, fileenv, process, o.CWD, o.Home); e != nil {
 		return c, e
+	}
+	if err := ctx.Err(); err != nil {
+		return c, err
+	}
+	c.freeze()
+	if err := ctx.Err(); err != nil {
+		return c, err
 	}
 	return c, nil
 }

@@ -34,9 +34,9 @@
 - 文本帮助、进度和 summary/device 可读报告采用简洁中文，排版不逐字复制 Ruby；自动化使用 JSON。错误保留安全代码，底层 Ruby 异常类名称不会跨语言复制。
 - Netdisco 接入原生 Go connector。HTTP/PostgreSQL 与缓存模式均已接线；缓存是 Go connector 私有格式/身份，不读取 Ruby 缓存文件。复用配置中的公开 `netdisco`/`inventory` 字段和 `ND_*`/筛选环境变量，包括自定义 `device_rules`；Ruby YAML 中非当前 connector schema 的字段明确拒绝。不要跨实现共用缓存目录。
 - 信号取消统一退出 130，确认输入期间同样有效。对于库中注入的任意 `io.Reader`，取消会立即返回，但调用者应在释放 App 时解除其阻塞读取；App 不关闭调用者持有的输入流。
-- 当前候选 go.mod 下限为正式 `go-net-connector v0.3.0` / `go-expect v0.4.0`，但共享 Netdisco Fetch 是待发布的新接口；本轮使用授权 go.work 联合验证，无 go.mod replace。正式独立消费者与打包验证待共享接口发布并更新版本后执行。历史验证不能当作当前候选的独立安装或发行证明。
+- `go.mod` 固定正式 `go-net-connector v0.4.0` / `go-expect v0.4.1`，包含共享 Netdisco Fetch API。构建和独立交付检查使用 `GOWORK=off`；源码消费者与已发布标签消费者分别验证，见 [验证说明](verification.md)。
 - 已接受且正文校验通过的命令，遇到后续回调、日志或取消错误仍保留维度解析结果；`collection` 单独记录错误并保持非成功。没有可验证正文时，该维度仍为 failed，仅保留回执元数据；设备拒绝或未完成原文不会作为配置事实解析。原始回执指纹来自 wire 字节，分页与编码转换不改变该指纹的输入；新增尝试进度字段不替换现有证据字段。具体 Go interface 变更见 [迁移说明](api-migration.md)。
 
 ## 验证边界
 
-金样与差分是已覆盖输入的证据，不是 NX-OS 全语法证明。已对 6 台真实 NX-OS 完成 SSH 只读采集，并将同一批数据与 Ruby 驱动/Collector 回放比对，详见 verification.md。真实 PostgreSQL、生产配置写入、业务连通性、远程 CI、部署和公开发布未执行。Linux/macOS 四目标交叉编译通过；实际执行环境为 macOS arm64。所有 apply 测试仍使用合成会话或确认前的本地 PTY，没有下发生产配置。
+金样与差分是已覆盖输入的证据，不是 NX-OS 全语法证明。2026-10-26 曾对 6 台真实 NX-OS 完成 SSH 只读采集，并与 Ruby 驱动/Collector 回放比对；该历史结果不能外推为新版实机验收。v0.2.0 的远程 CI、公开发布与正式版本消费者已验证，记录见 [验证说明](verification.md)。真实 PostgreSQL、生产配置写入、业务连通性与部署不在本次证据内。apply 测试使用合成会话或本地 PTY，没有下发生产配置。

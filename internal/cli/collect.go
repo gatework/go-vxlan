@@ -16,7 +16,7 @@ import (
 )
 
 func (a *App) collect(ctx context.Context, f *pflag.FlagSet) int {
-	c, e := a.collectOptions(f)
+	c, e := a.collectOptions(ctx, f)
 	if e != nil {
 		return a.fail(e)
 	}

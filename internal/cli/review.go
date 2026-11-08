@@ -29,7 +29,7 @@ func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
 	}
 	var policy vxlan.Record
 	if p := flagString(f, "fabric-policy"); p != "" {
-		policy, e = bootstrap.ReadYAML(bootstrap.Absolute(p, a.CWD, a.Home))
+		policy, e = bootstrap.ReadYAML(ctx, bootstrap.Absolute(p, a.CWD, a.Home))
 		if e != nil {
 			return a.fail(e)
 		}

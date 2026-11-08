@@ -63,19 +63,21 @@ func ValidateFabricPolicy(policy vxlan.Record) error {
 }
 
 type fabricReview struct {
-	documents vxlan.Record
-	groups    vxlan.Record
-	findings  []vxlan.Record
-	items     vxlan.Record
-	coverage  []vxlan.Record
-	role      any
-	indexes   map[string]*configuration.
-
-		// ReviewFabric compares explicit same-role deployed services and blocks unsafe drafts.
-		SubnetIndex
+	documents      vxlan.Record
+	groups         vxlan.Record
+	findings       []vxlan.Record
+	items          vxlan.Record
+	coverage       []vxlan.Record
+	role           any
+	indexes        map[string]*configuration.SubnetIndex
+	verify         []string
+	verifyBlockers []string
 }
 
-func ReviewFabric(documents []vxlan.Record, policy vxlan.Record) (result vxlan.Record, err error) {
+// ReviewFabric compares explicit same-role deployed services and blocks unsafe drafts.
+// Verification commands come from the selected profile's catalog. A missing
+// fabric scope preserves review findings but prevents executable candidates.
+func ReviewFabric(documents []vxlan.Record, policy vxlan.Record, queries QueryCatalog) (result vxlan.Record, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok {
@@ -89,7 +91,17 @@ func ReviewFabric(documents []vxlan.Record, policy vxlan.Record) (result vxlan.R
 	if e := ValidateFabricPolicy(policy); e != nil {
 		return nil, e
 	}
-	r := &fabricReview{documents: vxlan.Record{}, groups: vxlan.Record{}, findings: []vxlan.Record{}, items: vxlan.Record{}, coverage: []vxlan.Record{}, indexes: map[string]*configuration.SubnetIndex{}}
+	r := &fabricReview{
+		documents: vxlan.Record{}, groups: vxlan.Record{}, items: vxlan.Record{},
+		findings: []vxlan.Record{}, coverage: []vxlan.Record{},
+		indexes: map[string]*configuration.SubnetIndex{},
+	}
+	if queries != nil {
+		r.verify = append([]string{}, queries.VerificationCommands("fabric")...)
+	}
+	if len(r.verify) == 0 {
+		r.verifyBlockers = []string{"所选 Profile 缺少 Fabric 验证查询，无法验证变更；先补充查询定义。"}
+	}
 	observed := []string{}
 	for _, document := range documents {
 		d, err := vxlan.ProjectRecord(document)
@@ -205,11 +217,28 @@ func (r *fabricReview) recommendation(fabric string, vni any, code, title string
 	if vni != nil {
 		scope = "VNI " + record.String(vni)
 	}
-	return vxlan.Record{"code": code, "category": "fabric", "scope": fabric + " / " + record.String(r.role) + " / " + scope, "title": title, "status": "blocked", "evidence": evidence, "prerequisites": []string{"仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。", "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。"}, "blockers": []string{}, "commands": []string{}, "rollback": []string{}, "verify": []string{"show running-config", "show nve vni", "show ip interface brief vrf all"}, "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。", "expected": "共同业务的网关和访问控制一致，允许/拒绝流量均符合设计。", "references": []string{}}
+	return vxlan.Record{
+		"code": code, "category": "fabric",
+		"scope": fabric + " / " + record.String(r.role) + " / " + scope,
+		"title": title, "status": "blocked", "evidence": evidence,
+		"prerequisites": []string{
+			"仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+			"下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+		},
+		"blockers": append([]string{}, r.verifyBlockers...),
+		"commands": []string{}, "rollback": []string{},
+		"verify":     append([]string{}, r.verify...),
+		"impact":     "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+		"expected":   "共同业务的网关和访问控制一致，允许/拒绝流量均符合设计。",
+		"references": []string{},
+	}
 }
 func (r *fabricReview) propose(item vxlan.Record, plan *changepkg.ChangePlan, blocked bool) {
 	if blocked {
 		domainAppend(item, "blockers", "共同业务的承载关联或复制/路由声明存在冲突，先解决这些前置问题，再生成网关或 ACL 增量。")
+		return
+	}
+	if len(r.verifyBlockers) > 0 {
 		return
 	}
 	item["status"] = "candidate"
@@ -451,34 +480,46 @@ func (r *fabricReview) reviewGateway(fabric string, vni int, rows []vxlan.Record
 		}
 	}
 	expected = record.Unique(expected)
+	var address any
+	if len(expected) == 1 && len(expected[0].([]string)) == 1 {
+		address = expected[0].([]string)[0]
+	}
+	contexts := make([]any, 0, len(rows))
+	for _, entry := range rows {
+		contexts = append(contexts, []any{record.Map(entry["svi"])["vrf"], record.Map(entry["svi"])["anycast"], record.Map(entry["config"])["anycast_mac"]})
+	}
+	contexts = record.Unique(contexts)
+	contextOK := len(contexts) == 1
+	if contextOK {
+		for _, value := range contexts[0].([]any) {
+			if !record.Truthy(value) {
+				contextOK = false
+			}
+		}
+	}
+	// Address, VNI, host scope and exclusions are fixed for this gateway review.
+	// Query each distinct VRF once; candidate count must not multiply a fabric scan.
+	conflictsByVRF := map[string][]vxlan.Record{}
 	for i, row := range rows {
 		if len(expected) == 1 && record.Equal(values[i], expected[0]) {
 			continue
 		}
 		item := r.recommendation(fabric, vni, "fabric_gateway", "网关地址需要一致", append([]vxlan.Record{}, evidence...))
-		var address any
-		if len(expected) == 1 && len(expected[0].([]string)) == 1 {
-			address = expected[0].([]string)[0]
-		}
 		change := vxlan.Record{"kind": "svi_gateway_add", "vlan": record.Number(row["vlan"]), "vni": vni, "vrf": record.Map(row["svi"])["vrf"], "address": address}
-		contexts := []any{}
-		for _, entry := range rows {
-			contexts = append(contexts, []any{record.Map(entry["svi"])["vrf"], record.Map(entry["svi"])["anycast"], record.Map(entry["config"])["anycast_mac"]})
-		}
-		contexts = record.Unique(contexts)
-		contextOK := len(contexts) == 1
-		if contextOK {
-			for _, v := range contexts[0].([]any) {
-				if !record.Truthy(v) {
-					contextOK = false
-				}
-			}
-		}
 		conflicts := []vxlan.Record{}
 		if address != nil {
-			conflicts = r.gatewayConflicts(configs, change, hosts, "", "")
+			key, err := record.CanonicalJSON(change["vrf"])
+			if err != nil {
+				panic(err)
+			}
+			var found bool
+			conflicts, found = conflictsByVRF[string(key)]
+			if !found {
+				conflicts = r.gatewayConflicts(configs, change, hosts, "", "")
+				conflictsByVRF[string(key)] = conflicts
+			}
 		}
-		item["evidence"] = append(record.Rows(item["evidence"]), conflicts...)
+		item["evidence"] = append(record.Rows(item["evidence"]), record.CopyRecords(conflicts)...)
 		plan := changepkg.CandidateChangePlan(change, record.Map(row["config"]))
 		if len(conflicts) == 0 && contextOK && len(expected) == 1 && len(expected[0].([]string)) == 1 && plan != nil {
 			r.propose(item, plan, blocked)

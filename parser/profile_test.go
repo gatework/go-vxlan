@@ -42,6 +42,9 @@ func TestProfileValidationAndIsolation(t *testing.T) {
 			s.ModelParsers = map[string]map[string]parser.ParseFunc{"n9k": {"bad": s.Queries[2].Parse}}
 		},
 		func(s *parser.ProfileSpec) { s.Queries[2].Parse = nil },
+		func(s *parser.ProfileSpec) { s.Verification["fabric"] = nil },
+		func(s *parser.ProfileSpec) { s.Verification[" "] = []string{"show running-config"} },
+		func(s *parser.ProfileSpec) { s.Verification["fabric"][0] = " " },
 	} {
 		s := nxos.ProfileSpec()
 		modify(&s)
@@ -75,6 +78,38 @@ func TestProfileRejectsTerminalControls(t *testing.T) {
 		s.Preparation[0] += string(c)
 		if _, e := parser.NewRegistry(map[string]parser.ProfileSpec{"cisco_nxos": s}); e == nil {
 			t.Fatalf("accepted preparation control %d", c)
+		}
+		s = nxos.ProfileSpec()
+		s.Verification["fabric"][0] += string(c)
+		if _, e := parser.NewRegistry(map[string]parser.ProfileSpec{"cisco_nxos": s}); e == nil {
+			t.Fatalf("accepted verification control %d", c)
+		}
+	}
+}
+
+func TestVerificationQueriesAreOwnedAndDoNotAddCollectionDimensions(t *testing.T) {
+	spec := nxos.ProfileSpec()
+	registry, err := parser.NewRegistry(map[string]parser.ProfileSpec{"cisco_nxos": spec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec.Verification["fabric"][0] = "changed input"
+	delete(spec.Verification, "fabric")
+	for range 2 {
+		profile, err := registry.Fetch("cisco_nxos", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		commands := profile.VerificationCommands("fabric")
+		if len(commands) != 3 || commands[0] != "show running-config" || commands[2] != "show ip interface brief vrf all" {
+			t.Fatalf("verification declaration changed: %v", commands)
+		}
+		commands[0] = "changed accessor"
+		if profile.VerificationCommands("fabric")[0] != "show running-config" {
+			t.Fatal("verification accessor leaked mutable state")
+		}
+		if len(profile.Dimensions()) != len(spec.Queries) || profile.Command("fabric") != "" || profile.Command("interfaces") != "show interface brief" || len(profile.VerificationCommands("unknown")) != 0 {
+			t.Fatal("review queries changed collection declarations")
 		}
 	}
 }

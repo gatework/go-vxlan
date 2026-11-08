@@ -52,7 +52,7 @@ func TestDomainEncodingFailuresDoNotPanicOrBecomeNoConflict(t *testing.T) {
 		t.Fatal("unencodable route target accepted")
 	}
 	policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
-	if _, err := review.ReviewFabric([]vxlan.Record{cycle}, policy); !errors.Is(err, record.ErrEvidence) {
+	if _, err := review.ReviewFabric([]vxlan.Record{cycle}, policy, nil); !errors.Is(err, record.ErrEvidence) {
 		t.Fatal("invalid fabric document accepted", err)
 	}
 }

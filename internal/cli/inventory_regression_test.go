@@ -30,19 +30,31 @@ func TestInventoryNamespaceAndCacheMigration(t *testing.T) {
 	defer srv.Close()
 	dir := t.TempDir()
 	nd := vxlan.Record{"source": "http", "url": srv.URL, "allow_insecure_http": true, "cache_enabled": true, "cache_directory": filepath.Join(dir, "cache"), "cache_namespace": "first", "cache_mode": "refresh"}
-	c := bootstrap.Config{Inventory: vxlan.Record{"netdisco": nd}, Environment: map[string]string{"ND_API_KEY": "key-one"}, Values: vxlan.Record{}}
+	load := func(key string) bootstrap.Config {
+		t.Helper()
+		c, err := bootstrap.Load(t.Context(), bootstrap.ConfigOptions{
+			CWD: dir, Home: dir, Directories: []string{dir},
+			Environment: map[string]string{"ND_API_KEY": key}, Overrides: vxlan.Record{"netdisco": nd},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	c := load("key-one")
 	first, err := bootstrap.FetchInventory(t.Context(), c)
 	if err != nil || len(first.Devices) != 1 || first.Cache.Status == "" || first.Cache.FetchedAt.IsZero() {
 		t.Fatal("source evidence lost", first, err)
 	}
 	count := requests.Load()
 	nd["cache_mode"] = "only"
-	c.Environment["ND_API_KEY"] = "rotated-key"
+	c = load("rotated-key")
 	second, err := bootstrap.FetchInventory(t.Context(), c)
 	if err != nil || len(second.Devices) != 1 || requests.Load() != count {
 		t.Fatal("namespace failed across key rotation", second, err)
 	}
 	nd["cache_namespace"] = "second"
+	c = load("rotated-key")
 	if _, err := bootstrap.FetchInventory(t.Context(), c); !errors.Is(err, netdisco.ErrCacheRefreshRequired) {
 		t.Fatal("unverified identity was reused", err)
 	}
@@ -50,6 +62,7 @@ func TestInventoryNamespaceAndCacheMigration(t *testing.T) {
 		t.Fatal("only mode fetched the network")
 	}
 	nd["cache_mode"] = "prefer"
+	c = load("rotated-key")
 	third, err := bootstrap.FetchInventory(t.Context(), c)
 	if err != nil || len(third.Devices) != 1 || requests.Load() == count {
 		t.Fatal("prefer did not refresh new identity", third, err)
@@ -69,7 +82,7 @@ func TestDeliveryReviewerDeviceRules(t *testing.T) {
 	config := vxlan.Record{"netdisco": vxlan.Record{"url": srv.URL, "allow_insecure_http": true, "cache_enabled": false}, "inventory": vxlan.Record{"device_rules": []any{vxlan.Record{"vendor": "OEM", "connector": "cisco_nxos"}}}}
 	b, _ := json.Marshal(config)
 	os.WriteFile(filepath.Join(dir, "vxlan.yml"), b, 0600)
-	c, e := bootstrap.Load(bootstrap.ConfigOptions{CWD: dir, Home: dir, Directories: []string{dir}, Environment: map[string]string{"ND_API_KEY": "test"}})
+	c, e := bootstrap.Load(t.Context(), bootstrap.ConfigOptions{CWD: dir, Home: dir, Directories: []string{dir}, Environment: map[string]string{"ND_API_KEY": "test"}})
 	if e != nil {
 		t.Fatal(e)
 	}

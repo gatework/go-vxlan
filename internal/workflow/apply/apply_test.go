@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
@@ -16,6 +17,7 @@ const configuration = "hostname LEAF\nvlan 8\n  vn-segment 10008\ninterface Vlan
 type testSession struct {
 	writes   int
 	writeErr error
+	commands []string
 }
 
 func (s *testSession) ReadConfiguration(context.Context) (vxlan.Record, error) {
@@ -25,7 +27,11 @@ func (s *testSession) ReadConfiguration(context.Context) (vxlan.Record, error) {
 	}
 	return nxos.ParseConfig(body, true).Records[0], nil
 }
-func (s *testSession) Write(context.Context, string) error { s.writes++; return s.writeErr }
+func (s *testSession) Write(_ context.Context, command string) error {
+	s.writes++
+	s.commands = append(s.commands, command)
+	return s.writeErr
+}
 
 type testJournal struct {
 	write    func(vxlan.Record) error
@@ -204,5 +210,56 @@ func TestRunJoinsAdmittedCallbackBeforePublication(t *testing.T) {
 	case <-finalized:
 	default:
 		t.Fatal("missing final publication")
+	}
+}
+
+func TestJournalProjectionsCannotMutateExecution(t *testing.T) {
+	plan := testPlan(t)
+	session := &testSession{}
+	var retained []vxlan.Record
+	mutate := func(snapshot vxlan.Record) error {
+		retained = append(retained, snapshot)
+		if !slices.Equal(snapshot["commands"].([]string), plan.Commands()) {
+			t.Fatal("earlier journal mutation changed approved commands")
+		}
+		for i, step := range snapshot["steps"].([]vxlan.Record) {
+			if step["index"] != i || step["status"] != "acknowledged" {
+				t.Fatal("journal mutation changed acknowledgement history")
+			}
+			step["index"] = -1
+		}
+		snapshot["status"] = "changed"
+		snapshot["commands"].([]string)[0] = "reboot"
+		snapshot["device"].(vxlan.Record)["host"] = "198.51.100.1"
+		snapshot["pending_command"] = -1
+		snapshot["error"] = "changed"
+		return nil
+	}
+	result, err := Run(t.Context(), plan, func(ctx context.Context, run func(context.Context, Session) error) error {
+		return run(ctx, session)
+	}, testJournal{write: mutate, finalize: mutate})
+	if err != nil || result.State["status"] != "configuration_verified" || !slices.Equal(session.commands, plan.Commands()) {
+		t.Fatalf("journal mutation changed execution: %v %v", result.State, err)
+	}
+	if _, exists := result.State["pending_command"]; exists {
+		t.Fatal("final state retained a pending command")
+	}
+	if _, exists := result.State["error"]; exists {
+		t.Fatal("journal injected an execution error")
+	}
+	if result.State["device"].(vxlan.Record)["host"] != plan.Host() {
+		t.Fatal("journal mutation changed returned identity")
+	}
+	for i, step := range result.State["steps"].([]vxlan.Record) {
+		if step["index"] != i {
+			t.Fatal("journal mutation changed returned history")
+		}
+	}
+	for _, snapshot := range retained {
+		snapshot["commands"].([]string)[0] = "later mutation"
+		snapshot["device"].(vxlan.Record)["host"] = "203.0.113.1"
+	}
+	if !slices.Equal(result.State["commands"].([]string), plan.Commands()) || result.State["device"].(vxlan.Record)["host"] != plan.Host() {
+		t.Fatal("retained journal projection aliases returned state")
 	}
 }

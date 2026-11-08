@@ -20,7 +20,7 @@ type Session interface {
 // returned error includes independent cleanup failures, even after verification.
 type Opener func(context.Context, func(context.Context, Session) error) error
 
-// Journal consumes each state synchronously without retaining or mutating it.
+// Journal receives an owned state projection for each synchronous publication.
 // An error after a visible rename implements PublicationCommitted() bool.
 // FinalizeExecution preserves an independent durable checkpoint and invalidates
 // unconfirmed success when the final publication or its recovery fails.
@@ -47,28 +47,27 @@ func Run(ctx context.Context, plan *change.ExecutionPlan, open Opener, journal J
 	if !plan.Valid() || open == nil || journal == nil {
 		return Result{}, &runError{change.ErrExecutionPlan}
 	}
-	state := vxlan.Record{"status": "confirmed", "device": plan.Device(), "plan_sha256": plan.PlanSHA256(), "plan_item": plan.ItemID(), "expected_config_sha256": plan.ExpectedConfigSHA256(), "commands": plan.Commands(), "steps": []vxlan.Record{}}
-	started, verified := false, false
+	state := executionState{plan: plan, commands: plan.Commands(), status: executionConfirmed}
 	fail := func(cause error, finalization bool) (Result, error) {
-		state["status"] = "failed"
-		if started {
-			state["status"] = "uncertain"
+		state.status = executionFailed
+		if state.started {
+			state.status = executionUncertain
 		}
-		state["error"] = "execution_failed"
+		state.errorCode = "execution_failed"
 		if finalization {
-			state["error"] = "execution_finalization_unconfirmed"
+			state.errorCode = "execution_finalization_unconfirmed"
 		}
 		interrupted := ctx.Err() != nil || errors.Is(cause, context.Canceled)
 		if interrupted {
-			state["error"] = "interrupted"
+			state.errorCode = "interrupted"
 		}
-		publicationErr := journal.WriteExecution(context.WithoutCancel(ctx), state)
-		return Result{State: state, ReportUnconfirmed: publicationErr != nil || finalization, Interrupted: interrupted}, &runError{errors.Join(cause, ctx.Err(), publicationErr)}
+		publicationErr := journal.WriteExecution(context.WithoutCancel(ctx), state.record())
+		return Result{State: state.record(), ReportUnconfirmed: publicationErr != nil || finalization, Interrupted: interrupted}, &runError{errors.Join(cause, ctx.Err(), publicationErr)}
 	}
 	if err := ctx.Err(); err != nil {
 		return fail(err, false)
 	}
-	if err := journal.WriteExecution(ctx, state); err != nil {
+	if err := journal.WriteExecution(ctx, state.record()); err != nil {
 		return fail(err, false)
 	}
 	operation := func(operationCtx context.Context, session Session) error {
@@ -90,28 +89,28 @@ func Run(ctx context.Context, plan *change.ExecutionPlan, open Opener, journal J
 		if err = plan.CheckBefore(before); err != nil {
 			return err
 		}
-		for i, command := range plan.Commands() {
+		for i, command := range state.commands {
 			if err = checkContext(); err != nil {
 				return err
 			}
-			state["status"], state["pending_command"] = "executing", i
-			if err = journal.WriteExecution(operationCtx, state); err != nil {
+			state.status, state.pendingCommand = executionRunning, new(i)
+			if err = journal.WriteExecution(operationCtx, state.record()); err != nil {
 				var publication interface{ PublicationCommitted() bool }
 				if errors.As(err, &publication) && publication.PublicationCommitted() {
-					started = true
+					state.started = true
 				}
 				return err
 			}
-			started = true
+			state.started = true
 			if err = checkContext(); err != nil {
 				return err
 			}
 			if err = session.Write(operationCtx, command); err != nil {
 				return err
 			}
-			state["steps"] = append(state["steps"].([]vxlan.Record), vxlan.Record{"index": i, "status": "acknowledged"})
-			delete(state, "pending_command")
-			if err = journal.WriteExecution(context.WithoutCancel(operationCtx), state); err != nil {
+			state.acknowledged = append(state.acknowledged, i)
+			state.pendingCommand = nil
+			if err = journal.WriteExecution(context.WithoutCancel(operationCtx), state.record()); err != nil {
 				return err
 			}
 			if err = checkContext(); err != nil {
@@ -126,27 +125,27 @@ func Run(ctx context.Context, plan *change.ExecutionPlan, open Opener, journal J
 		if err != nil {
 			return err
 		}
-		state["observed_config_sha256"] = digest
-		verified = true
+		state.observedConfigSHA256 = digest
+		state.verified = true
 		return checkContext()
 	}
 	if err := ownedOpen(ctx, open, operation); err != nil {
 		return fail(err, false)
 	}
-	if !verified {
+	if !state.verified {
 		return fail(change.ErrExecutionPlan, false)
 	}
 	if err := ctx.Err(); err != nil {
 		return fail(err, false)
 	}
-	state["status"] = "configuration_verified"
-	if err := journal.FinalizeExecution(ctx, state); err != nil {
+	state.status = executionVerified
+	if err := journal.FinalizeExecution(ctx, state.record()); err != nil {
 		return fail(err, true)
 	}
 	if err := ctx.Err(); err != nil {
 		return fail(err, true)
 	}
-	return Result{State: state}, nil
+	return Result{State: state.record()}, nil
 }
 
 // A faulty injected opener cannot replay the operation, erase its callback

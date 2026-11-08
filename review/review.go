@@ -22,9 +22,12 @@ func Advice(doc vxlan.Record, queries QueryCatalog, scripts bool, additions []vx
 	return advice, nil
 }
 
-// QueryCatalog supplies verification commands from the selected parser profile.
-// Recommendations never executes these commands or owns a transport session.
-type QueryCatalog interface{ Command(string) string }
+// QueryCatalog supplies collection and review-only verification commands from
+// the selected parser profile. Review never executes commands or owns a session.
+type QueryCatalog interface {
+	Command(string) string
+	VerificationCommands(scope string) []string
+}
 
 func queryCommand(queries QueryCatalog, dimension string) string {
 	if queries == nil {

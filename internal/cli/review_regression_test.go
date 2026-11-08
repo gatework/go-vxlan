@@ -32,7 +32,7 @@ func TestConfigReviewValidation(t *testing.T) {
 	for _, body := range []string{"fabric_policy: 123\n", "common: wrong\nvxlan: wrong\n"} {
 		d := t.TempDir()
 		os.WriteFile(filepath.Join(d, "vxlan.yml"), []byte(body), 0600)
-		if _, e := bootstrap.Load(bootstrap.ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{}}); e == nil {
+		if _, e := bootstrap.Load(t.Context(), bootstrap.ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{}}); e == nil {
 			t.Fatal("invalid config accepted", body)
 		}
 	}
@@ -41,7 +41,7 @@ func TestBlankSelectorUsesDotenv(t *testing.T) {
 	d := t.TempDir()
 	os.WriteFile(filepath.Join(d, ".env"), []byte("VXLAN_CONFIG=custom.yml\n"), 0600)
 	os.WriteFile(filepath.Join(d, "custom.yml"), []byte("fabric: CUSTOM\n"), 0600)
-	c, e := bootstrap.Load(bootstrap.ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{"VXLAN_CONFIG": ""}})
+	c, e := bootstrap.Load(t.Context(), bootstrap.ConfigOptions{CWD: d, Home: d, Directories: []string{d}, Environment: map[string]string{"VXLAN_CONFIG": ""}})
 	if e != nil || c.Values["fabric"] != "CUSTOM" {
 		t.Fatal(c, e)
 	}

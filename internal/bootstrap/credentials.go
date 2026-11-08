@@ -7,22 +7,18 @@ import (
 	"github.com/gatework/go-net-connector/connector"
 )
 
-func Credentials(c Config) (connector.ConnectionConfig, error) {
-	secret := func(vendor, general string) string {
-		v := c.Environment[vendor]
-		if strings.TrimSpace(v) == "" {
-			v = c.Environment[general]
-		}
-		return v
+func credential(environment map[string]string, vendor, general string) string {
+	v := environment[vendor]
+	if strings.TrimSpace(v) == "" {
+		v = environment[general]
 	}
-	username := secret("NC_CISCO_NXOS_USERNAME", "NC_DEVICE_USERNAME")
-	if strings.TrimSpace(username) == "" {
+	return v
+}
+
+func Credentials(c Config) (connector.ConnectionConfig, error) {
+	settings := c.runtime.Connection
+	if strings.TrimSpace(settings.Username) == "" {
 		return connector.ConnectionConfig{}, fmt.Errorf("请设置 NC_DEVICE_USERNAME 或 NC_CISCO_NXOS_USERNAME")
 	}
-
-	settings := c.runtime.Connection
-	settings.Username = username
-	settings.Password = secret("NC_CISCO_NXOS_PASSWORD", "NC_DEVICE_PASSWORD")
-	settings.EnablePassword = c.Environment["NC_ENABLE_PASSWORD"]
 	return settings, nil
 }

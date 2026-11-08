@@ -22,10 +22,12 @@ type QuerySpec struct {
 	Parse     ParseFunc
 }
 
-// ProfileSpec describes a platform. ModelParsers replaces parsers by dimension;
-// it cannot add undeclared commands or dimensions.
+// ProfileSpec describes a platform. Verification lists review-only commands by
+// business scope; they do not create collection dimensions. ModelParsers replaces
+// parsers by dimension; it cannot add undeclared commands or dimensions.
 type ProfileSpec struct {
 	Queries      []QuerySpec
+	Verification map[string][]string
 	Preparation  []string
 	AbsentReason func(string, vxlan.Observation, bool) string
 	ModelParsers map[string]map[string]ParseFunc
@@ -51,6 +53,7 @@ type Profile struct {
 	preparation  []string
 	absentReason func(string, vxlan.Observation, bool) string
 	commands     map[string]string
+	verification map[string][]string
 	parsers      map[string]ParseFunc
 }
 
@@ -70,7 +73,12 @@ func NewRegistry(specs map[string]ProfileSpec) (*Registry, error) {
 		if _, ok := r.profiles[key]; ok {
 			return nil, fmt.Errorf("duplicate platform")
 		}
-		p := Profile{preparation: slices.Clone(s.Preparation), absentReason: s.AbsentReason, commands: make(map[string]string, len(s.Queries)), parsers: make(map[string]ParseFunc, len(s.Queries))}
+		p := Profile{
+			preparation: slices.Clone(s.Preparation), absentReason: s.AbsentReason,
+			commands:     make(map[string]string, len(s.Queries)),
+			verification: make(map[string][]string, len(s.Verification)),
+			parsers:      make(map[string]ParseFunc, len(s.Queries)),
+		}
 		if len(s.Queries) == 0 {
 			return nil, fmt.Errorf("empty query declarations")
 		}
@@ -91,6 +99,17 @@ func NewRegistry(specs map[string]ProfileSpec) (*Registry, error) {
 			if !validCommand(command) {
 				return nil, fmt.Errorf("invalid preparation command")
 			}
+		}
+		for scope, commands := range s.Verification {
+			if strings.TrimSpace(scope) == "" || len(commands) == 0 {
+				return nil, fmt.Errorf("invalid verification scope")
+			}
+			for _, command := range commands {
+				if !validCommand(command) {
+					return nil, fmt.Errorf("invalid verification command")
+				}
+			}
+			p.verification[scope] = slices.Clone(commands)
 		}
 		d := profileDefinition{profile: p, modelParsers: map[string]map[string]ParseFunc{}}
 		for model, overrides := range s.ModelParsers {
@@ -128,6 +147,10 @@ func (r *Registry) Fetch(platform, model string) (*Profile, error) {
 	p.queries = slices.Clone(p.queries)
 	p.preparation = slices.Clone(p.preparation)
 	p.commands = maps.Clone(p.commands)
+	p.verification = make(map[string][]string, len(d.profile.verification))
+	for scope, commands := range d.profile.verification {
+		p.verification[scope] = slices.Clone(commands)
+	}
 	p.parsers = maps.Clone(p.parsers)
 	maps.Copy(p.parsers, d.modelParsers[normalized(model)])
 	return &p, nil
@@ -141,8 +164,15 @@ func (p *Profile) Dimensions() []string {
 	}
 	return names
 }
-func (p *Profile) Commands() map[string]string   { return maps.Clone(p.commands) }
-func (p *Profile) Command(name string) string    { return p.commands[name] }
+func (p *Profile) Commands() map[string]string { return maps.Clone(p.commands) }
+func (p *Profile) Command(name string) string  { return p.commands[name] }
+
+// VerificationCommands returns review-only commands for a business scope.
+// They do not add collection dimensions or command parsers.
+func (p *Profile) VerificationCommands(scope string) []string {
+	return slices.Clone(p.verification[scope])
+}
+
 func (p *Profile) PreparationCommands() []string { return slices.Clone(p.preparation) }
 func (p *Profile) AbsentReason(name string, configuration vxlan.Observation, beforeQuery bool) string {
 	if p.absentReason == nil {

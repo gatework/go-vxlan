@@ -24,9 +24,9 @@ func Collection(ctx context.Context, c Config, devices []any, open OpenFunc) (wo
 		return workflow.CollectionOptions{}, fmt.Errorf("并发资源不足")
 	}
 	var policy vxlan.Record
-	if c.Policy != nil {
+	if c.runtime.policy != nil {
 		var err error
-		policy, err = vxlan.ProjectRecord(c.Policy)
+		policy, err = vxlan.ProjectRecord(c.runtime.policy)
 		if err != nil {
 			return workflow.CollectionOptions{}, err
 		}

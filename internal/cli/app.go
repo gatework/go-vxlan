@@ -16,7 +16,7 @@ import (
 	"golang.org/x/term"
 )
 
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 type App struct {
 	profiles           *parser.Registry
@@ -98,7 +98,7 @@ func (a *App) flags(name string) *pflag.FlagSet {
 }
 func flagBool(f *pflag.FlagSet, k string) bool     { v, _ := f.GetBool(k); return v }
 func flagString(f *pflag.FlagSet, k string) string { v, _ := f.GetString(k); return v }
-func (a *App) collectOptions(f *pflag.FlagSet) (bootstrap.Config, error) {
+func (a *App) collectOptions(ctx context.Context, f *pflag.FlagSet) (bootstrap.Config, error) {
 	if f.NArg() != 0 {
 		return bootstrap.Config{}, fmt.Errorf("不接受位置参数")
 	}
@@ -135,7 +135,7 @@ func (a *App) collectOptions(f *pflag.FlagSet) (bootstrap.Config, error) {
 		}
 		overrides[key] = parts
 	}
-	c, e := bootstrap.Load(bootstrap.ConfigOptions{CWD: a.CWD, Home: a.Home, Program: a.Program, Directories: a.Directories, ConfigFile: flagString(f, "config"), EnvFile: flagString(f, "env-file"), Environment: a.Environment, Overrides: overrides, AllowMissing: flagBool(f, "init"), EnvironmentOnly: flagBool(f, "init")})
+	c, e := bootstrap.Load(ctx, bootstrap.ConfigOptions{CWD: a.CWD, Home: a.Home, Program: a.Program, Directories: a.Directories, ConfigFile: flagString(f, "config"), EnvFile: flagString(f, "env-file"), Environment: a.Environment, Overrides: overrides, AllowMissing: flagBool(f, "init"), EnvironmentOnly: flagBool(f, "init")})
 	return c, e
 }
 func (a *App) initialize(ctx context.Context, c bootstrap.Config, f *pflag.FlagSet) error {

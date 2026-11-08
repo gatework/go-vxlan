@@ -36,7 +36,7 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	}
 	var fabric vxlan.Record
 	if policy != nil {
-		audit, e := review.ReviewFabric(documents, policy)
+		audit, e := review.ReviewFabric(documents, policy, options.Queries)
 		if e != nil {
 			return nil, e
 		}

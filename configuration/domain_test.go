@@ -2,7 +2,6 @@ package configuration_test
 
 import (
 	"encoding/json"
-	"github.com/gatework/go-vxlan/vendors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +12,7 @@ import (
 	"github.com/gatework/go-vxlan/configuration"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/vendors"
 )
 
 func TestDomainRubyCorpus(t *testing.T) {
@@ -43,7 +43,8 @@ func TestDomainRubyCorpus(t *testing.T) {
 				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
 				got = review.Recommendations(record.Map(in["document"]), profile)
 			case "fabric":
-				got, callErr = review.ReviewFabric(record.Rows(in["documents"]), record.Map(in["policy"]))
+				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+				got, callErr = review.ReviewFabric(record.Rows(in["documents"]), record.Map(in["policy"]), profile)
 			case "combine":
 				got = review.CombineRecommendations(record.Map(in["advice"]), record.Rows(in["additions"]))
 			case "build":

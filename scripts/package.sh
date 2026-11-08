@@ -26,7 +26,7 @@ fi
 test -f "docs/releases/v$version.md"
 mkdir -p "$work/common/docs/releases" "$work/common/licenses/go" "$work/archives"
 cp README.md LICENSE "$work/common/"
-cp docs/architecture.md docs/api-migration.md docs/compatibility.md docs/RELEASING.md "$work/common/docs/"
+cp docs/architecture.md docs/api-migration.md docs/compatibility.md docs/verification.md docs/RELEASING.md "$work/common/docs/"
 cp "docs/releases/v$version.md" "$work/common/docs/releases/"
 goroot=$("$GO" env GOROOT)
 license="$goroot/LICENSE"

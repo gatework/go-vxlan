@@ -33,6 +33,9 @@ func ReadSources(ctx context.Context, batch string) ([]Source, error) {
 			return nil, err
 		}
 		body, e := os.ReadFile(p)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if e != nil {
 			return nil, e
 		}
@@ -50,6 +53,9 @@ func ReadSources(ctx context.Context, batch string) ([]Source, error) {
 		}
 		hosts[host], names[name] = true, true
 		sources = append(sources, Source{p, body, doc})
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return sources, nil
 }

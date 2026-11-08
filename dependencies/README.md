@@ -11,7 +11,9 @@
 | go-net-connector-source.tar.gz | `86e6134eea6b9796fb5987690af93d8975a2a2281cf8a8d626759f317b89b26a` |
 | go-expect-source.tar.gz | `ffce729a2b0dc33ad68d2330a7899ac2cf5409d41afb55e2328b261608937bac` |
 
-所有交付检查设置 `GOWORK=off`；connector/expect 不允许本地 replace。go-vxlan 本身尚未发布时，外部消费者只替换这份候选源码，该结果不等同于已发布模块的安装验证。见 `scripts/check-delivery.py`。
+当前职责深化候选的 go.mod 下限已升为 connector v0.3.0，新增共享 Fetch API 及 InventoryEnvironment/ValidateInventory 尚待正式发布；本轮在授权 go.work 联合验证。发布后更新正式版本，再执行下述独立交付门禁，详见 [迁移说明](../docs/api-migration.md)。
+
+所有独立交付检查设置 `GOWORK=off`；connector/expect 不允许本地 replace。go-vxlan 本身尚未发布时，外部消费者只替换这份候选源码，该结果不等同于已发布模块的安装验证。见 `scripts/check-delivery.py`。
 
 构建常规公开第三方模块时 Go 可能需要网络访问。Ruby 及其依赖只用于开发期金样生成，不参与构建和执行。
 

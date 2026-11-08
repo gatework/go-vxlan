@@ -9,8 +9,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEPENDENCIES = {
-    "github.com/gatework/go-net-connector": "v0.2.0",
-    "github.com/gatework/go-expect": "v0.4.0",
+    "github.com/gatework/go-net-connector": "v0.4.0",
+    "github.com/gatework/go-expect": "v0.4.1",
 }
 
 
@@ -32,6 +32,7 @@ def main():
     module = json.loads(run(["go", "mod", "edit", "-json"], ROOT, capture=True))
     if module.get("Replace"):
         raise RuntimeError("candidate go.mod must not contain replacements")
+    run(["python3", "scripts/check-architecture.py"], ROOT)
     verify_dependencies(ROOT)
     run(["go", "mod", "verify"], ROOT)
     run(["go", "mod", "tidy", "-diff"], ROOT)
@@ -66,9 +67,13 @@ def main():
             "replace github.com/gatework/go-vxlan => " + json.dumps(str(isolated)) + "\n"
         )
         (consumer / "main.go").write_text(
-            'package main\nimport("fmt"; vxlan "github.com/gatework/go-vxlan"; '
-            '_ "github.com/gatework/go-vxlan/adapter")\n'
-            'func main(){o,e:=vxlan.ParseConfigChecked("hostname LEAF\\n",true);'
+            'package main\nimport("fmt"; nxos "github.com/gatework/go-vxlan/vendors/nxos"; '
+            '_ "github.com/gatework/go-vxlan/adapter/netconnector"; '
+            '_ "github.com/gatework/go-vxlan/collect"; '
+            '_ "github.com/gatework/go-vxlan/configuration"; '
+            '_ "github.com/gatework/go-vxlan/change"; '
+            '_ "github.com/gatework/go-vxlan/review")\n'
+            'func main(){o,e:=nxos.ParseConfigChecked("hostname LEAF\\n",true);'
             'if e!=nil||!o.Complete(){panic("parse failed")};fmt.Println(o)}\n'
         )
         run(["go", "mod", "tidy"], consumer)

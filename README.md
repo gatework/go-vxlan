@@ -2,7 +2,7 @@
 
 Cisco NX-OS VXLAN/EVPN 配置与运行态采集、证据解析、Fabric 审查和受控增量变更。参考 Ruby VXLAN `3c7b855` 实现，运行时不需要 Ruby。
 
-支持 Go 1.26 及以上，Linux/macOS amd64/arm64。依赖固定为已发布的 `go-net-connector v0.2.0` 与 `go-expect v0.4.0`，直接通过 Go modules 构建；首版发行目标为 `v0.1.0`；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
+支持 Go 1.26 及以上，Linux/macOS amd64/arm64。当前版本 `v0.2.0`，固定使用正式依赖 `go-net-connector v0.4.0` 与 `go-expect v0.4.1`，通过 `GOWORK=off` 独立构建。公开业务包路径有所调整，升级前阅读 [API 迁移](docs/api-migration.md)；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
 
 ```sh
 GOWORK=off go test -mod=readonly ./...
@@ -10,7 +10,7 @@ GOWORK=off go build -mod=readonly -o bin/vxlan ./cmd/vxlan
 ./bin/vxlan --help
 ```
 
-构建无需恢复 `.work/` 或设置本地 replace。旧依赖快照的来源记录见 [dependencies/README.md](dependencies/README.md)；接口迁移见 [迁移说明](docs/api-migration.md)。
+当前联合验证使用任务 go.work，不设置 go.mod replace，也不恢复历史 `.work/`。旧依赖快照的来源记录见 [dependencies/README.md](dependencies/README.md)；接口迁移见 [迁移说明](docs/api-migration.md)。
 
 ## CLI
 
@@ -57,29 +57,36 @@ ssh:
 
 报告目录为 `0700`，文件为 `0600`；证据、建议、计划和事件通过临时文件、同步和原子替换发布。先读 `summary.json` 的最终状态和 `report_saved`，再查看 `devices/`、`evidence/`；报告失败保留已有事实。
 
-`apply` 仅接受计划中明确选择的一项，要求真实终端输入包含目标、计划摘要和条目 ID 的确认串。执行前重新校验计划、渲染命令、采集配置并检查漂移；写前记录执行日志，逐条执行后读回验收。结果不明时保留 `uncertain`，不自动重放、回滚或保存配置。
+`apply` 仅接受计划中明确选择的一项，要求真实终端输入包含目标、计划摘要和条目 ID 的确认串。执行前重新校验计划、渲染命令、采集配置并检查漂移；写前记录执行日志，逐条执行后读回验收。结果不明时保留 `uncertain`，不自动重放、回滚或保存配置。成功发布前先持久化独立 `execution-checkpoint.json`；该文件存在时优先按结果不明处理，即使 `execution.json` 可见成功状态。只有执行返回成功、最终文件持久化且检查点删除持久化全部确认，才报告配置回读已验证。
 
 ## Go API
 
 ```go
-observation, err := vxlan.ParseConfigChecked(text, true)
+observation, err := nxos.ParseConfigChecked(text, true)
 // observation.Complete() 只表示证据完整性。
 
-parser := new(vxlan.ConfigurationParser)
+parser := new(nxos.ConfigurationParser)
 observation, err = parser.Parse(text, true)
 document := parser.Document()
 captures := document.CapturesFor("interfaces", "Vlan10")
 ```
 
-`ParseRuntime` 解析运行态；`DefaultParserRegistry` 与 `NXOSProfileSpec` 支持独立实例的型号覆盖。`Collect` 通过 opener 借用一段操作会话，opener 持有连接和关闭职责；回调收到与操作生命周期关联的 context。`CollectSession` 借用已打开的独占会话。`Capture.Complete` 表示命令已接受且正文校验通过，完整 Capture 可能与后置错误同时返回；采集保留该维度事实并在 `collection` 记录错误。`adapter.Open` 接入 Go connector。
+`vendors/nxos.ParseRuntime` 解析运行态；`vendors.NewBuiltinRegistry` 与 `nxos.ProfileSpec` 通过有序 QuerySpec 支持独立实例的型号覆盖。`collect.Collect` 显式接收已选 Profile，通过 opener 借用一段操作会话，opener 持有连接和关闭职责；回调收到与操作生命周期关联的 context。`collect.CollectSession` 借用已打开的独占会话。`Capture.Complete` 表示命令已接受且正文校验通过，完整 Capture 可能与后置错误同时返回；采集保留该维度事实并在 `collection` 记录错误。`adapter/netconnector.Open` 接入 Go connector。
 
-`ReviewFabric`、`Recommendations`、`ServiceCatalog` 和 `NewChangePlan` 提供领域能力；变更包含 `svi_acl`、`svi_gateway_add`、`vlan_vni_add` 三类。公开观察对象由调用者持有，可修改；构造、解析和计划访问器复制输入或输出，避免跨调用共享。`ConfigurationParser` 实例不支持并发调用，使用独立实例。
+`NewEvidenceDocument` 将原生 Snapshot 与离线 `DecodeDocument` 输出投影到相同的已校验证据；`ProjectRecord` 拒绝循环、非有限数值、不可投影类型，保留精确数字与 null/空容器区别。`Fingerprint` 现在返回 `(string, error)`；无效值没有摘要。`change.NewExecutionPlan` 持有选中条目的原始文件摘要、设备、预期配置摘要和重渲染命令，`ChangePlan` 仍表示独立业务增量。
+
+`review.ReviewFabric`、`review.Recommendations`、`configuration.ServiceCatalog` 和 `change.NewChangePlan` 提供领域能力；变更包含 `svi_acl`、`svi_gateway_add`、`vlan_vni_add` 三类。公开观察对象由调用者持有，可修改；构造、解析和计划访问器复制输入或输出，避免跨调用共享。`ConfigurationParser` 实例不支持并发调用，使用独立实例。
+
+包职责、导入方向和扩展方式见 [架构说明](docs/architecture.md)；公共 Go API 路径调整见 [迁移说明](docs/api-migration.md)。CLI 实现在 `internal/cli`，库消费者直接使用业务包。
 
 ## 验证
+
+当前候选联合验证使用任务 go.work 和 `GOFLAGS=-mod=readonly`；以下独立消费者及发行门禁须在共享 Fetch 正式发布、更新依赖版本后执行，不能用本地联编替代。
 
 ```sh
 GOWORK=off go test -mod=readonly -race ./...
 GOWORK=off go vet -mod=readonly ./...
+python3 scripts/check-architecture.py
 GOWORK=off go mod verify
 python3 scripts/check-delivery.py
 ```

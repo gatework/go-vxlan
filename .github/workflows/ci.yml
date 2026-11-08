@@ -30,6 +30,7 @@ jobs:
           cache-dependency-path: go.sum
       - run: go mod verify
       - run: go mod tidy -diff
+      - run: python3 scripts/check-architecture.py
       - run: go vet ./...
       - run: go test -race -count=1 -timeout=180s ./...
       - if: matrix.go == '1.27.3'
@@ -62,7 +63,7 @@ jobs:
       - run: sh scripts/package.sh
       - name: Verify release archives
         run: |
-          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' cli/app.go)
+          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' internal/cli/app.go)
           sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
       - id: artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -100,6 +101,6 @@ jobs:
           unzip -q artifact.zip -d dist
       - name: Validate and execute the packaged binary
         run: |
-          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' cli/app.go)
+          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' internal/cli/app.go)
           sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
           python3 scripts/package-smoke.py dist "v$version"

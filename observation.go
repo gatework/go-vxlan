@@ -1,11 +1,10 @@
-// Package vxlan models Cisco NX-OS VXLAN evidence independently of its transport.
 package vxlan
 
 import (
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
+
+	"github.com/gatework/go-vxlan/internal/record"
 )
 
 type Record = map[string]any
@@ -29,7 +28,10 @@ func NewObservation(name, status string, records, issues, evidence []Record) (Ob
 	default:
 		return Observation{}, fmt.Errorf("invalid observation status")
 	}
-	return Observation{Name: name, Status: status, Records: copyRecords(records), Issues: copyRecords(issues), Evidence: copyRecords(evidence)}, nil
+	if _, err := ProjectRecord(Record{"records": records, "issues": issues, "evidence": evidence}); err != nil {
+		return Observation{}, err
+	}
+	return Observation{Name: name, Status: status, Records: record.CopyRecords(records), Issues: record.CopyRecords(issues), Evidence: record.CopyRecords(evidence)}, nil
 }
 func (o Observation) Complete() bool { return o.Status == "complete" }
 func (o Observation) String() string {
@@ -61,90 +63,3 @@ func (s Snapshot) String() string {
 	return fmt.Sprintf("Snapshot{complete=%t dimensions=%d}", s.Complete(), len(s.Dimensions))
 }
 func (s Snapshot) GoString() string { return s.String() }
-func copyRecords(in []Record) []Record {
-	out := make([]Record, len(in))
-	for i, r := range in {
-		out[i] = clone(r).(Record)
-	}
-	return out
-}
-func clone(v any) any {
-	if v == nil {
-		return nil
-	}
-	switch x := v.(type) {
-	case map[string]any:
-		y := Record{}
-		for k, v := range x {
-			y[k] = clone(v)
-		}
-		return y
-	case []Record:
-		return copyRecords(x)
-	case []any:
-		y := make([]any, len(x))
-		for i, v := range x {
-			y[i] = clone(v)
-		}
-		return y
-	case []string:
-		return append([]string{}, x...)
-	case json.Number:
-		return x
-	default:
-		return cloneReflect(reflect.ValueOf(v)).Interface()
-	}
-}
-func observation(name, status string, rows, issues []Record) Observation {
-	o, _ := NewObservation(name, status, rows, issues, nil)
-	return o
-}
-
-func cloneReflect(v reflect.Value) reflect.Value {
-	if !v.IsValid() {
-		return reflect.ValueOf((*any)(nil)).Elem()
-	}
-	switch v.Kind() {
-	case reflect.Interface:
-		if v.IsNil() {
-			return v
-		}
-		r := reflect.New(v.Type()).Elem()
-		r.Set(cloneReflect(v.Elem()))
-		return r
-	case reflect.Map:
-		if v.IsNil() {
-			return reflect.Zero(v.Type())
-		}
-		r := reflect.MakeMapWithSize(v.Type(), v.Len())
-		iter := v.MapRange()
-		for iter.Next() {
-			r.SetMapIndex(iter.Key(), cloneReflect(iter.Value()))
-		}
-		return r
-	case reflect.Slice:
-		if v.IsNil() {
-			return reflect.Zero(v.Type())
-		}
-		r := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
-		for i := 0; i < v.Len(); i++ {
-			r.Index(i).Set(cloneReflect(v.Index(i)))
-		}
-		return r
-	case reflect.Pointer:
-		if v.IsNil() {
-			return reflect.Zero(v.Type())
-		}
-		r := reflect.New(v.Type().Elem())
-		r.Elem().Set(cloneReflect(v.Elem()))
-		return r
-	case reflect.Array:
-		r := reflect.New(v.Type()).Elem()
-		for i := 0; i < v.Len(); i++ {
-			r.Index(i).Set(cloneReflect(v.Index(i)))
-		}
-		return r
-	default:
-		return v
-	}
-}

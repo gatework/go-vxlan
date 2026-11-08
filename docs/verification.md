@@ -1,6 +1,60 @@
 # 验证记录
 
-## 当前验证：2026-11-07 正式依赖与采集回执
+## 2026-11-07 v0.2.0 正式依赖采纳
+
+用户在组织重构验收后授权发布。Connector v0.4.0 和 Expect v0.4.1 已完成各自同提交 CI、发布附件核验及全新缓存、无替换的正式消费者检查；本模块已固定这两个版本。此前共享 API 未发布的阻塞已解除，下文候选状态保留为历史记录。
+
+更新依赖后，在 `GOWORK=off` 下通过全包 race/shuffle、vet、govulncheck，以及完整 `scripts/check-delivery.py`（架构边界、模块 verify/tidy、隔离源码全包测试、四平台构建、公开业务包消费者及仓库外安装后 CLI）。本脚本的本模块消费者仍是源码候选检查；正式 v0.2.0 发布后另用全新缓存、无任何 replace 的消费者验证标签。
+
+日志与后续 CI/artifact/release 账本保存于 sibling `release-20261107-164506/`。发行只能复用本提交成功 CI 的不可变制品；此准备记录不预先声明 VXLAN 已发布，也不代表新增真实设备验证或部署。
+
+## 2026-11-07 组织重构：最终本地验证
+
+本节对应 `organization-20261107-155459` 阶段；此前证据/生命周期修复已保留。日志根目录是任务 worktree 的同级 `organization-20261107-155459/`。未提交、推送或发布，没有真实设备、生产清单或远程 CI 验收。
+
+| 检查 | 结果与日志 |
+| --- | --- |
+| 有序 QuerySpec、迁移后的所有包、Ruby 事实/来源/业务金样 | 全量 `go test ./...` 通过；金样未重新生成 |
+| Go 1.27.3 全量 race + shuffle，`-count=1 -timeout=180s` | 通过；`vxlan-organization-race.log` |
+| 最终回调取消/写入失败修复后的 workflow/apply/report/CLI race | 通过；`vxlan-organization-finalization-race.log`；四种模式核对返回和持久化摘要指纹相等、采集/输出各一次、证据保留 |
+| Go 1.26.0 全量测试 | 通过；`vxlan-organization-go126.log`；后续最终回调变更另见 `vxlan-organization-go126-finalization.log` |
+| typed Settings 抽取后的 bootstrap/CLI race 与 Go 1.26.0 | 通过；`vxlan-organization-settings-race.log` / `vxlan-organization-go126-settings.log`；gopls 无诊断，`vxlan-organization-settings-gopls.log` |
+| 最终 `go vet ./...` | 通过；`vxlan-organization-vet.log` |
+| gopls 关键边界检查 | 无诊断；`vxlan-organization-gopls.log` |
+| 生产导入方向门禁 | 通过；`vxlan-organization-architecture.log`，已接入 CI 与 check-delivery |
+| GOWORK=off mod verify / tidy -diff | 通过；`vxlan-organization-modules.log` / `vxlan-organization-tidy.log`；Cobra v1.10.2 固定依赖，无本地 replace |
+| 离线 release/reuse 脚本 | 两组各 14 项通过；`vxlan-organization-release-tests.log` |
+| 冻结重构前二进制的 40 个离线 CLI 场景 | 退出码和 JSON 比较通过；`cli-compare-vxlan.json`、空 `cli-mismatches-vxlan.json`；最终联合检查另由四模块集成流程记录 |
+| 未配置项目规则的默认 golangci-lint | **未通过，继承的 lint 债务**；冻结基线默认 49 项，候选 48 项（相同 43 个 errcheck、5 个 staticcheck，移除 1 个未使用 helper）。展开数量限制后基线 74、候选 71；两处 help 源码仅改为 profile 维度查询，未增加诊断种类。日志 `vxlan-baseline-lint.log` / `vxlan-final-lint.log`，展开比较见 `vxlan-before-default-lint.log` / `vxlan-organization-default-lint.log` / `vxlan-lint-comparison.json`；没有新增 broad exclusion |
+| GOWORK=off check-delivery | **发布前阻断继续保留**；`vxlan-organization-standalone-blocked.log`。正式 connector v0.3.0 缺少 InventoryEnvironment/ValidateInventory 与新增 Fetch/cache API，隔离副本编译失败；未改用 workspace 或弱化消费者门禁 |
+
+公共 Go API 按 [迁移表](api-migration.md) 调整；机器 schema、精确整数/null/空容器、指纹、命令顺序和执行 no-replay/uncertain 检查保持。上下文回归另覆盖取消后已接受证据落盘，以及离线 review/读取/发布在已取消 context 下不产生成功报告。最终通知/结果输出之后的取消与错误现在会使持久化摘要和返回值一致，这是明确修复的生命周期行为。
+
+独立发布、正式依赖归档和外部安装门禁需要先发布共享 Connector API 并更新版本；本节 workspace 成功不能替代那些证据。
+
+## 前一阶段：2026-11-07 四仓库职责深化
+
+在专属 `network-modules-20261107-075052/go-vxlan` worktree 实施，原工作树保持不变。没有提交、推送、发布或访问真实设备。当前依赖下限为 connector v0.3.0 / expect v0.4.0；新增共享 Fetch 接口来自明确授权的四仓库 go.work。除独立模块检查外，以下 Go 检查使用该 workspace、`GOFLAGS=-mod=readonly`，并非已发布依赖的消费者证明。
+
+| 检查 | 本轮结果与任务日志 |
+| --- | --- |
+| Go 1.26.0 全量 `go test -race -count=1 -timeout=180s ./...` | 通过；root 25.374s、adapter 6.765s、cli 11.699s、internal/apply 6.457s；`TASK/logs/vxlan-go126-race.log` |
+| Go 1.26.0 `go vet ./...` | 通过；`vxlan-go126-vet.log` |
+| 最后将配置读取 capability 移入 adapter 后，Go 1.26.0 adapter/cli/internal/apply race | 通过；`vxlan-go126-final-adapter.log` |
+| Go 1.27.3 gopls check | checked evidence、execution plan、executor、journal、inventory、review 及最终 adapter/CLI 装配无诊断；`vxlan-gopls.log` |
+| Go 1.27.3 govulncheck | `No vulnerabilities found.`；`vxlan-govulncheck.log` |
+| GOWORK=off `go mod verify` / `go mod tidy -diff` | 通过；`vxlan-module-check.log` |
+| 离线 release/reuse 脚本测试 | 两组各 14 项通过；`vxlan-release-script-tests-retry.log`。首次并行工具链构建期间 reuse 一项触发自身 10 秒 timeout，原始失败保留在 `vxlan-release-script-tests.log`，串行复核通过 |
+| Go 1.27.3 workspace Linux/macOS × amd64/arm64 CGO=0 编译，macOS arm64 CLI version/help/parse smoke | 通过；`vxlan-workspace-builds.log`，本地二进制位于 TASK/artifacts；这不是正式依赖归档验证 |
+| `python3 scripts/check-delivery.py`，GOWORK=off | **未通过，预期的发布前阻断**：已发布 connector v0.3.0 尚无 FetchHTTP/FetchPostgres/FetchOptions/CachePolicy/ErrCacheRefreshRequired。隔离源码阶段编译失败；`vxlan-standalone-delivery-blocked.log`。脚本没有弱化，须在共享接口正式发布、更新依赖后重跑消费者、四目标正式打包与安装门禁 |
+
+本轮回归覆盖精确大数/小数、null 与空容器、循环与共享 slice 视图、不可投影值、计划访问器所有权、原始文件与 before 配置绑定、命令重渲染、committed intent、取消前后的发送/ack 边界、被 opener 忽略的 callback 错误、重复/缺失/提前返回的 callback、独立清理失败、最终发布/恢复/撤销失败，以及检查点删除同步失败后的连锁存储故障。既有 Ruby 金样和索引分配增长断言全部保留。
+
+adapter 的借用操作测试使用真实 connector 命令引擎加 net.Pipe；accepted Body 与后置 hook/清理 error 同时保留，配置 capability 不把带 error 的正文用于授权后续写入。共享缓存测试使用本地 httptest，覆盖 namespace 的 key 轮换、only 拒绝新身份和 prefer 重新采集。没有真设备、真实 PostgreSQL、生产配置变更、远程 CI 或发布证据。
+
+新增接口、缓存迁移例外与检查点的判定优先级见 [迁移说明](api-migration.md)。下方先前验证与实机数据仅保留历史，不可用来替代当前候选的发布或设备验收。
+
+## 先前验证：2026-11-07 正式依赖与采集回执
 
 环境：macOS arm64。最低 Go 版本仍为 1.26.0；正式依赖为 `go-net-connector v0.2.0`、`go-expect v0.4.0`，无本地依赖 replace。源码在独立副本中修改和验证，未提交、推送或发布。
 

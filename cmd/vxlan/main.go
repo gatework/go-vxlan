@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/gatework/go-vxlan/cli"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/gatework/go-vxlan/internal/cli"
 )
 
 func main() {

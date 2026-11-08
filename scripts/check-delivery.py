@@ -44,7 +44,7 @@ def main():
             ROOT,
             isolated,
             ignore=shutil.ignore_patterns(
-                ".git", ".work", ".superpowers", "bin", "go.work", "go.work.sum",
+                ".git", ".work", ".superpowers", "bin", "dist", "go.work", "go.work.sum",
                 ".env", "vxlans", "vxlan-executions", "__pycache__",
             ),
         )

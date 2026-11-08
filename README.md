@@ -10,7 +10,7 @@ GOWORK=off go build -mod=readonly -o bin/vxlan ./cmd/vxlan
 ./bin/vxlan --help
 ```
 
-当前联合验证使用任务 go.work，不设置 go.mod replace，也不恢复历史 `.work/`。旧依赖快照的来源记录见 [dependencies/README.md](dependencies/README.md)；接口迁移见 [迁移说明](docs/api-migration.md)。
+依赖由 `go.mod/go.sum` 管理，无需本地依赖副本或 workspace 重建步骤。接口迁移见 [迁移说明](docs/api-migration.md)。
 
 ## CLI
 
@@ -81,7 +81,7 @@ captures := document.CapturesFor("interfaces", "Vlan10")
 
 ## 验证
 
-当前候选联合验证使用任务 go.work 和 `GOFLAGS=-mod=readonly`；以下独立消费者及发行门禁须在共享 Fetch 正式发布、更新依赖版本后执行，不能用本地联编替代。
+以下检查使用 `GOWORK=off` 和 `GOFLAGS=-mod=readonly`，Connector/Expect 均从正式版本解析。源码消费者与发行版本的检查范围见 [验证说明](docs/verification.md)。
 
 ```sh
 GOWORK=off go test -mod=readonly -race ./...

@@ -65,4 +65,4 @@ ChangePlan 只接受 `svi_acl`、`svi_gateway_add`、`vlan_vni_add`。人工 NVE
 
 `python3 scripts/check-architecture.py` 使用 `go list -json` 的生产导入图，禁止公开 cli、根证据反向依赖、parser 引入 vendor、collect 自选传输、configuration/change 反向依赖，以及业务层直接引入文件/网络/终端库。workflow 禁止依赖 bootstrap、CLI、Cobra 或 Connector。CI 和独立交付检查都运行该门禁。
 
-`go.work` 联编证明与 `GOWORK=off` 已发布依赖消费分别记录。新的 Connector inventory/config API 尚未发布；当前架构不以 replace 或降低交付检查来掩盖该发布前阻断。
+共享 inventory/config API 来自正式 Connector v0.4.0；Expect 固定为 v0.4.1。默认构建与独立交付检查使用 `GOWORK=off`，不恢复本地依赖快照。仓库只维护当前架构、迁移与验证文档，旧实施计划及依赖来源记录通过 Git 历史查询。

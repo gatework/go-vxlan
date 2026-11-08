@@ -1,4 +1,4 @@
-# 2026-11-07 组织重构与公共 API 迁移
+# 公共 API 迁移
 
 这是用户批准的公共 Go API 调整，不保留旧根包/公开 cli 的转发层。CLI 参数、默认值、JSON/schema、确认串与正常设备命令顺序保持不变；取消或输出失败发生在最终回调时，批次摘要会重新写为 interrupted/incomplete，修复原来返回状态与已发布摘要不一致的问题。包职责与依赖图见 [architecture.md](architecture.md)。
 
@@ -31,11 +31,11 @@ snapshot, err := collect.Collect(ctx, netconnector.Open(connection), collect.Req
 
 CLI 的 bootstrap 复用 Connector `config.InventoryEnvironment(values, higher)` 与 `config.ValidateInventory(document)`，仅处理共享 netdisco/inventory 部分；高优先级的 false/null/空集合仍屏蔽低优先级环境变量。应用配置、分层及相对路径规则不变。
 
-v0.2.0 发布采用正式 Connector v0.4.0、Expect v0.4.1，包含上述共享 API；默认构建不使用 workspace 或 replace。下文保留前一阶段证据/执行约束与历史验证，其中 v0.3.0 依赖阻塞是当时的候选状态，旧包路径按上表迁移。当前发布检查见 [验证记录](verification.md)。
+v0.2.0 采用正式 Connector v0.4.0、Expect v0.4.1，包含上述共享 API；默认构建不使用 workspace 或 replace。当前发布检查见 [验证说明](verification.md)。
 
-# 2026-11-07 候选：证据、执行绑定与共享清单
+## 证据、执行绑定与共享清单
 
-最低版本保持 Go 1.26.0，CLI 参数、配置字段、确认串、计划/报告 schema 和设备命令顺序保持兼容。此次为本地候选实现，未提交、未发布、未访问真实设备。go.mod 的 connector 下限升为已发布 v0.3.0；新的共享 Netdisco Fetch 尚需 connector 正式发布，因此当前只在明确授权的四仓库 go.work 中联编，不设置 replace、不填写不存在的版本。发布后须更新该正式版本并重新执行 GOWORK=off 消费、打包和安装门禁。
+最低版本保持 Go 1.26.0，CLI 参数、配置字段、确认串、计划/报告 schema 和设备命令顺序保持兼容。以下契约由公开业务包提供，共享 Netdisco 采集使用已发布 Connector API。
 
 ## Checked evidence 与 Fingerprint
 
@@ -61,7 +61,7 @@ int64 范围整数保持精确，更大数字和小数保留 json.Number，不�
 
 `CheckBefore` 同时验证完整结构、预期摘要和前提；公开 `CheckAfter(before, after)` 也重新验证 before 的绑定，再验证目标状态和其余配置保持不变。不能用另一份 before 绕过审批绑定。
 
-CLI 只负责参数、文件、真实终端确认、凭据和展示。`internal/apply` 通过小型 Session、Opener 和 Journal 能力执行一项已确认计划：单次借用，写前持久化 intent，接受回执后记 ack，最后回读。opener 忽略 callback 错误、重复调用或提前返回都不能抹去失败或让已进入的 callback 越过最终发布。
+CLI 只负责参数、文件、真实终端确认、凭据和展示。`internal/workflow/apply` 通过小型 Session、Opener 和 Journal 能力执行一项已确认计划：单次借用，写前持久化 intent，接受回执后记 ack，最后回读。opener 忽略 callback 错误、重复调用或提前返回都不能抹去失败或让已进入的 callback 越过最终发布。
 
 intent rename 已提交但目录同步失败时状态为 uncertain；不发送该命令。每次发送前后检查操作与父 context，取消后只进行必要的日志收尾。不会自动重放、重连、回退或保存配置。已接受正文与后置 error 的采集契约保留；apply 读取同时收到 error 时停止，不能用该正文授权下一条写入。
 
@@ -77,9 +77,9 @@ Report 发布错误现在保留 Unwrap 原因和 committed 属性，默认文本
 
 新身份包含有效来源、账号/namespace、查询形态和 page_size，不再由 CLI 拼装含原始 API key 的身份 JSON。显式 namespace 可支持同一账号的 key 轮换。新身份不静默重标或借用旧缓存：prefer/refresh 重新采集；only 无法验证条目时提示先刷新，不连接设备或静默联网。字段、配置优先级和 CLI 退出码不变。
 
-# 先前迁移：正式依赖与采集回执（历史记录）
+## 原生连接器与采集回执
 
-本轮固定 `github.com/gatework/go-net-connector v0.2.0` 和 `github.com/gatework/go-expect v0.4.0`，最低版本保持 Go 1.26.0。旧依赖归档及恢复脚本已退役；构建、测试和交付检查统一使用 `GOWORK=off`。历史来源见 [dependencies/README.md](../dependencies/README.md)。
+构建、测试和交付检查统一使用 `GOWORK=off`。旧依赖归档及恢复脚本已移除，历史实现可从 v0.1.0 标签查询。
 
 ## OpenSession 回调
 
@@ -88,11 +88,11 @@ Report 发布错误现在保留 Unwrap 原因和 committed 属性，默认文本
 ```go
 type OpenSession func(context.Context, func(context.Context, Session) error) error
 
-snapshot, err := vxlan.Collect(ctx, adapter.Open(config), request)
+snapshot, err := collect.Collect(ctx, netconnector.Open(config), request)
 // 检查 err，同时检查 snapshot 的 collection 状态；解析事实与执行结果分别保留。
 ```
 
-自定义 opener 应把其操作 context 传给回调，而非悄悄换成 Background。`adapter.Open` 传递 connector 的 admitted context，设备 Close 可取消它；采集与 apply 内部使用该 context。没有额外生命周期的测试 opener 可以把传入的 ctx 原样传给回调。
+自定义 opener 应把其操作 context 传给回调，而非悄悄换成 Background。`netconnector.Open` 传递 connector 的 admitted context，设备 Close 可取消它；采集与 apply 内部使用该 context。没有额外生命周期的测试 opener 可以把传入的 ctx 原样传给回调。
 
 `CollectSession(ctx, session, request)` 仍只借用会话，不打开、关闭、提权或重连。命令不会自动重放。opener 继续拥有连接和关闭职责。
 
@@ -114,18 +114,16 @@ adapter 从 `Response.Raw()` 计算 `sha256` 和 `bytes`，不使用已解码、
 
 错误保留 `Unwrap` 链，调用者可用 `errors.Is` 识别取消、超时。默认格式化仅显示安全代码；底层错误须显式解包。除单一 `CodedError.FailureCode()` 外，采集也识别可选的 `FailureCodes() []string`，保留独立原因并按代码去重。adapter 从公开错误链提取各原因；已分类的 connector 错误作为语义叶处理，不重复分类它的底层原因。
 
-上游 v0.2.0 内部清理错误没有公开分类，独立的未知原因保留为 `command_failed`；只有 opener 明确捕获的关闭失败标为 `session_close_failed`。不通过错误文本或私有类型猜测。即使后续关闭重试成功，首次失败也不会消失。
+没有公开分类的独立原因保留为 `command_failed`；只有 opener 明确捕获的关闭失败标为 `session_close_failed`。不通过错误文本或私有类型猜测。即使后续关闭重试成功，首次失败也不会消失。
 
 采集复制回执中的时间值和证据，后续会话复用不改变已返回结果。
 
 ## 依赖消费与资源归属
 
-NX-OS profile 由 `vendors.NewBuiltinRegistry().Lookup("cisco_nxos")` 获取；清单使用 `fleet.NewRules` 与同一内置 registry。VXLAN 自身的配置分层、字段、设备筛选和严格主机密钥规则保持不变，不套用上游 CLI 的站点配置迁移。
+解析 profile 由 VXLAN 的 `vendors.NewBuiltinRegistry().Fetch("cisco_nxos", model)` 获取；设备连接使用 Connector 内建 registry 的 NX-OS 方言，清单复用其 `fleet.NewRules`。VXLAN 自身的配置分层、字段、设备筛选和严格主机密钥规则保持不变，不套用上游 CLI 的站点配置迁移。
 
 文件描述符预检由 VXLAN CLI 持有，维持 `128 + 16 × min(parallel, selected)` 的原预算。仅在现有硬限制内提高进程软限制；不足时在建立设备连接前失败。测试在子进程中调整限制，避免污染测试宿主。
 
 交付脚本验证依赖的固定版本与无 replace 状态，隔离副本执行测试、四目标编译和临时安装。外部消费者仅对未发布的 go-vxlan 候选源码使用本地 replace；connector/expect 必须保持正式版本。这是候选源码消费检查，不是 go-vxlan 发布证明。
 
-## 历史范围
-
-上述先前迁移仅处理正式依赖和采集链路。本候选已完成本文前半部分的证据与执行整理；Ruby 金样未重新生成，真实设备和历史现场记录不等同于新版实机验收。
+Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明](verification.md)。

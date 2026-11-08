@@ -25,7 +25,9 @@ for target in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64; do
   tar -tzf "$archive" > "$work/entries"
   awk -v root="$name/" 'index($0,root) != 1 || $0 ~ /(^|\/)\.\.(\/|$)/ {exit 1}' "$work/entries"
   grep -Fx "$name/docs/releases/$tag.md" "$work/entries" > /dev/null
-  grep -Fx "$name/docs/api-migration.md" "$work/entries" > /dev/null
+  for document in architecture.md api-migration.md compatibility.md verification.md RELEASING.md; do
+    grep -Fx "$name/docs/$document" "$work/entries" > /dev/null
+  done
   grep -Fx "$name/LICENSE" "$work/entries" > /dev/null
   tar -xOf "$archive" "$name/LICENSE" > "$work/license"
   cmp LICENSE "$work/license"

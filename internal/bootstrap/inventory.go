@@ -209,7 +209,7 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 	}
 	mode := get("cache_mode", "prefer")
 	limits := netdisco.Limits{PageSize: num("page_size", 500), MaxPages: num("max_pages", 10000), MaxDevices: num("max_devices", 100000), MaxResponseBytes: int64(num("max_response_bytes", 16<<20)), MaxInventoryBytes: int64(num("max_inventory_bytes", 128<<20)), Timeout: time.Duration(num("inventory_timeout", 300)) * time.Second}
-	options := netdisco.FetchOptions{Mode: mode}
+	options := netdisco.FetchOptions{Mode: netdisco.CacheMode(mode)}
 	if nd["cache_enabled"] != false {
 		ttl := time.Duration(num("cache_ttl", 72*3600)) * time.Second
 		options.Cache = &netdisco.CachePolicy{Directory: get("cache_directory", ""), Namespace: get("cache_namespace", ""), TTL: &ttl}

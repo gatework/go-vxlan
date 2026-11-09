@@ -143,3 +143,7 @@ adapter 改用 Connector `Result.SingleAccepted(command)` 与 `StepResult.Body()
 交付脚本验证依赖的固定版本与无 replace 状态，隔离副本执行测试、四目标编译和临时安装。外部消费者仅对未发布的 go-vxlan 候选源码使用本地 replace；connector/expect 必须保持正式版本。这是候选源码消费检查，不是 go-vxlan 发布证明。
 
 Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明](verification.md)。
+
+## v0.3.1 依赖更新
+
+采用正式 Connector v0.6.0、Expect v0.5.0。Netdisco 缓存模式在内部调用边界转换为 `netdisco.CacheMode`；配置中的 prefer、refresh、only 取值不变。公开 VXLAN API 与设备命令不变。

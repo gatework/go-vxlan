@@ -34,7 +34,7 @@
 - 文本帮助、进度和 summary/device 可读报告采用简洁中文，排版不逐字复制 Ruby；自动化使用 JSON。错误保留安全代码，底层 Ruby 异常类名称不会跨语言复制。
 - Netdisco 接入原生 Go connector。HTTP/PostgreSQL 与缓存模式均已接线；缓存是 Go connector 私有格式/身份，不读取 Ruby 缓存文件。复用配置中的公开 `netdisco`/`inventory` 字段和 `ND_*`/筛选环境变量，包括自定义 `device_rules`；Ruby YAML 中非当前 connector schema 的字段明确拒绝。不要跨实现共用缓存目录。
 - 信号取消统一退出 130，确认输入期间同样有效。对于库中注入的任意 `io.Reader`，取消会立即返回，但调用者应在释放 App 时解除其阻塞读取；App 不关闭调用者持有的输入流。
-- `go.mod` 固定正式 `go-net-connector v0.4.0` / `go-expect v0.4.1`，包含共享 Netdisco Fetch API。构建和独立交付检查使用 `GOWORK=off`；源码消费者与已发布标签消费者分别验证，见 [验证说明](verification.md)。
+- `go.mod` 固定正式 `go-net-connector v0.6.0` / `go-expect v0.5.0`，包含共享 Netdisco Fetch API。构建和独立交付检查使用 `GOWORK=off`；源码消费者与已发布标签消费者分别验证，见 [验证说明](verification.md)。
 - 已接受且正文校验通过的命令，遇到后续回调、日志或取消错误仍保留维度解析结果；`collection` 单独记录错误并保持非成功。没有可验证正文时，该维度仍为 failed，仅保留回执元数据；设备拒绝或未完成原文不会作为配置事实解析。原始回执指纹来自 wire 字节，分页与编码转换不改变该指纹的输入；新增尝试进度字段不替换现有证据字段。具体 Go interface 变更见 [迁移说明](api-migration.md)。
 
 ## 验证边界

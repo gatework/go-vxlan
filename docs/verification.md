@@ -101,3 +101,7 @@ diff -qr "$vxlan_go/testdata" "$vxlan_oracle/testdata"
 - 对同一批传输正文与 Ruby Driver/Collector 回放比较，6 台共 78 个观测的 status、records、issues 一致；未排序或归一化诊断来掩盖差异。
 
 原始采集、回放 JSON 与设备报告属于本地私有 `.work/live-validation-*` 数据，不进入源码或公开 fixture。它们来自旧依赖的一次现场验证，不能外推为全部 83 台、v0.2.0 新版实机、真实 PostgreSQL、生产写入、业务连通性或部署验收。apply 回归仍使用合成会话或本地 PTY。
+
+## v0.3.1 本地候选检查
+
+正式 Connector v0.6.0 / Expect v0.5.0；Go 1.27.3 race/shuffle、vet、govulncheck 与独立交付检查通过，Go 1.26.0 全包兼容性测试通过。独立交付包含四平台构建、源码消费者和安装后离线 CLI。以上结果不代替同提交 CI、发行附件校验及正式标签消费者。

@@ -9,8 +9,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEPENDENCIES = {
-    "github.com/gatework/go-net-connector": "v0.5.0",
-    "github.com/gatework/go-expect": "v0.4.2",
+    "github.com/gatework/go-net-connector": "v0.6.0",
+    "github.com/gatework/go-expect": "v0.5.0",
 }
 
 

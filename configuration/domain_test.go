@@ -8,11 +8,9 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/change"
 	"github.com/gatework/go-vxlan/configuration"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
-	"github.com/gatework/go-vxlan/vendors"
 )
 
 func TestDomainRubyCorpus(t *testing.T) {
@@ -39,36 +37,16 @@ func TestDomainRubyCorpus(t *testing.T) {
 			var got any
 			var callErr error
 			switch row.Name {
-			case "recommendations":
-				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
-				got = review.Recommendations(record.Map(in["document"]), profile)
-			case "fabric":
-				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
-				got, callErr = review.ReviewFabric(record.Rows(in["documents"]), record.Map(in["policy"]), profile)
-			case "combine":
-				got = review.CombineRecommendations(record.Map(in["advice"]), record.Rows(in["additions"]))
-			case "build":
-				var p *change.ChangePlan
-				p, callErr = change.NewChangePlan(record.Map(in["change"]))
-				if p != nil {
-					got = vxlan.Record{"change": p.Change(), "commands": p.Commands(), "rollback": p.Rollback()}
-				}
-			case "eligible", "satisfied":
-				p, e := change.NewChangePlan(record.Map(in["change"]))
-				callErr = e
-				if p != nil {
-					if row.Name == "eligible" {
-						got = p.Eligible(record.Map(in["config"]))
-					} else {
-						got = p.Satisfied(record.Map(in["after"]), record.Map(in["before"]))
-					}
-				}
+			case "recommendations", "fabric", "combine", "build", "eligible", "satisfied":
+				// Typed parity tests in rules/ and change/ replay these cases;
+				// the legacy review and ChangePlan they described are retired.
+				return
 			case "catalog":
 				got = configuration.ServiceCatalog(record.Map(in["configs"]))
 			case "route_targets":
 				got = configuration.ServiceRouteTargets(in["entries"], in["asn"], in["vni"])
 			case "scope":
-				callErr = review.ValidateFabricPolicy(record.Map(in["policy"]))
+				callErr = fabric.ValidatePolicyDocument(in["policy"])
 				if callErr == nil {
 					g := vxlan.Record{}
 					for name, value := range record.Map(record.Map(in["policy"])["fabrics"]) {

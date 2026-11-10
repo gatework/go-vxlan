@@ -9,8 +9,8 @@ import (
 
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/configuration"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
 )
 
 func TestEvidenceRejectsAmbiguousValues(t *testing.T) {
@@ -51,8 +51,7 @@ func TestDomainEncodingFailuresDoNotPanicOrBecomeNoConflict(t *testing.T) {
 	if values := configuration.ServiceRouteTargets([]vxlan.Record{{"direction": "both", "target": func() {}}}, 65000, 10001); values != nil {
 		t.Fatal("unencodable route target accepted")
 	}
-	policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
-	if _, err := review.ReviewFabric([]vxlan.Record{cycle}, policy, nil); !errors.Is(err, record.ErrEvidence) {
+	if _, err := fabric.EncodeDocument(cycle); !errors.Is(err, fabric.ErrDocument) {
 		t.Fatal("invalid fabric document accepted", err)
 	}
 }

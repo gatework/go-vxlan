@@ -153,3 +153,17 @@ Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明
 新增公开包 `fabric`（类型化模型、`DecodeDocument`、`Build`、`Policy`、`Configuration.Services`）与 `rules`（`NewAssessor`、`Assess`、`DeviceRules`、`FabricRules`、`RuleIDs`、`Report`）。依赖 go-netops v0.1.1。既有公开 API、CLI 参数与 `plan.json` 不变；`review` 新增 `--rules-policy`，批次新增 `assessment.json`，`summary.json` 新增 `assessment`、`risk_counts`、`risk_highest`、`assessment_incomplete` 字段。
 
 新增：`fabric.Baseline`/`Expectation`/`DecodeBaseline`、`fabric.Operations`、`rules.Inputs`、`Assessor.AssessWith`、`rules.DeriveBaseline`、`BaselineRules`、`TemporalRules`；CLI 新增 `vxlan baseline` 与 `review --baseline`、`--previous`；`assessment.json` 新增 `baseline`、`changes`、`appeared`、`disappeared`。
+
+## 未发布：旧审查下线
+
+删除 `review` 包（`ReviewFabric`、`Recommendations`、`Advice`、`CombineRecommendations`、`ValidateFabricPolicy`、`QueryCatalog`、`InferServiceMapping`）与 `change.ChangePlan`/`NewChangePlan`/`CandidateChangePlan`。替代：
+
+| 旧 | 新 |
+| --- | --- |
+| `review.ValidateFabricPolicy` | `fabric.ValidatePolicyDocument` / `fabric.DecodePolicy` |
+| `review.ReviewFabric`、`Recommendations`、`Advice` | `rules.NewAssessor(policy, profile).Assess(ctx, model)` |
+| `InferServiceMapping` 与 Fabric 候选 | `rules.Increments(fabric, profile)` |
+| `change.NewChangePlan` | `change.DecodeChange`；`Render`、`Eligible`、`Satisfied`、`Preserved` |
+| `review.QueryCatalog` | `workflow.Queries`（内部）；`rules.Commands` / `rules.Verifier` |
+
+输出：`plan.json` schema 3 去掉 `audits` 与 `fabric`（改见 `assessment.json`），`summary.json` 的 `counts` 改为 `increments` 与 `risk_counts`，`layout_version` 4；采集证据文档的 `recommendations` 改为 `assessment`。`apply` 同时接受 schema 2 与 3 的计划。

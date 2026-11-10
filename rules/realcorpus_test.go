@@ -1,9 +1,6 @@
 package rules_test
 
 import (
-	"encoding/json"
-	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,10 +11,7 @@ import (
 	"github.com/gatework/go-netops/assess"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/fabric"
-	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/rules"
-	"github.com/gatework/go-vxlan/vendors"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
@@ -84,86 +78,6 @@ func realFabrics(t *testing.T) map[string]*realFabric {
 	return out
 }
 
-func TestRealFabricsMatchLegacyReview(t *testing.T) {
-	assessor, err := rules.NewAssessor(assess.Policy{}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	totals := map[string]int{}
-	newRules := map[assess.RuleID]int{}
-	for _, site := range slices.Sorted(maps.Keys(realFabrics(t))) {
-		rf := realFabrics(t)[site]
-		body, _ := json.Marshal(rf.policy)
-		var legacyPolicy vxlan.Record
-		_ = json.Unmarshal(body, &legacyPolicy)
-		legacy, err := review.ReviewFabric(rf.documents, record.Copy(legacyPolicy).(vxlan.Record), nil)
-		if err != nil {
-			t.Fatalf("%s legacy: %v", site, err)
-		}
-		want := map[string]bool{}
-		for _, f := range record.Rows(legacy["findings"]) {
-			code := record.String(f["code"])
-			if ported[code] {
-				vni := "-"
-				if f["vni"] != nil {
-					vni = fmt.Sprint(f["vni"])
-				}
-				want[code+"@"+vni] = true
-			}
-		}
-		for _, items := range record.Map(legacy["device_items"]) {
-			for _, item := range record.Rows(items) {
-				if item["code"] == "fabric_vlan_mapping_missing" {
-					_, after, _ := strings.Cut(record.String(item["scope"]), "VNI ")
-					want["fabric_vlan_mapping_missing@"+after] = true
-				}
-			}
-		}
-		var devices []*fabric.Device
-		for _, doc := range rf.documents {
-			d, err := fabric.EncodeDocument(doc)
-			if err != nil {
-				t.Fatal(err)
-			}
-			devices = append(devices, d)
-		}
-		model, err := fabric.Build(devices, &rf.policy)
-		if err != nil {
-			t.Fatal(err)
-		}
-		report, err := assessor.Assess(t.Context(), model)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got := map[string]bool{}
-		for _, fa := range report.Fabrics {
-			for _, f := range fa.Assessment.Findings {
-				if code := legacyCode(f); ported[code] {
-					got[code+"@"+subjectVNI(f.Subject)] = true
-				} else {
-					newRules[f.Rule]++
-				}
-			}
-		}
-		for _, d := range report.Devices {
-			for _, f := range d.Assessment.Findings {
-				newRules[f.Rule]++
-			}
-		}
-		for k := range want {
-			code, _, _ := strings.Cut(k, "@")
-			totals[code]++
-		}
-		missing, extra := diff(want, got), diff(got, want)
-		if len(missing)+len(extra) > 0 {
-			t.Errorf("fabric %d: typed rules differ from legacy\n missing %v\n extra   %v", len(rf.documents), missing, extra)
-		}
-		t.Logf("fabric with %d devices: %d legacy (code@vni) findings reproduced", len(rf.documents), len(want))
-	}
-	t.Logf("legacy finding counts by code: %v", totals)
-	t.Logf("typed-only findings by rule: %v", newRules)
-}
-
 func diff(a, b map[string]bool) []string {
 	var out []string
 	for k := range a {
@@ -215,31 +129,31 @@ func TestRealFabricsBaselineAndSelfComparison(t *testing.T) {
 	t.Logf("drift from derived (majority) baselines by rule: %v", byRule)
 }
 
-func TestRealFabricIncrementsMatchLegacy(t *testing.T) {
+// The real corpus must yield only increments the execution plan parser and
+// the typed checks accept; legacy parity was proven before the legacy review
+// was retired (55 identical plans).
+func TestRealFabricIncrementsAreEligible(t *testing.T) {
 	verify := profile(t)
-	p, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
 	total := 0
-	for _, site := range slices.Sorted(maps.Keys(realFabrics(t))) {
-		rf := realFabrics(t)[site]
-		body, _ := json.Marshal(rf.policy)
-		var legacyPolicy vxlan.Record
-		_ = json.Unmarshal(body, &legacyPolicy)
-		legacy, err := review.ReviewFabric(rf.documents, record.Copy(legacyPolicy).(vxlan.Record), p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		want := legacyCandidates(t, legacy)
+	for _, rf := range realFabrics(t) {
 		var devices []*fabric.Device
 		for _, doc := range rf.documents {
 			d, _ := fabric.EncodeDocument(doc)
 			devices = append(devices, d)
 		}
 		m, _ := fabric.Build(devices, &rf.policy)
-		got := typedCandidates(t, m, verify)
-		if missing, extra := diff(want, got), diff(got, want); len(missing)+len(extra) > 0 {
-			t.Errorf("fabric with %d devices: %d missing, %d extra executable increments", len(rf.documents), len(missing), len(extra))
+		byHost := map[string]*fabric.Device{}
+		for _, d := range m.Devices {
+			byHost[d.Host] = d
 		}
-		total += len(want)
+		for _, f := range m.Fabrics {
+			for _, inc := range rules.Increments(f, verify) {
+				if err := inc.Change.Eligible(byHost[inc.Host].Configuration); err != nil {
+					t.Errorf("increment not eligible on its device: %v", err)
+				}
+				total++
+			}
+		}
 	}
-	t.Logf("real legacy executable increments reproduced: %d", total)
+	t.Logf("real executable increments: %d", total)
 }

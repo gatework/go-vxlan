@@ -66,7 +66,7 @@ func testPlan(t *testing.T) *changepkg.ExecutionPlan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change, err := changepkg.NewChangePlan(vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"})
+	change, err := newChangePlan(vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"})
 	if err != nil {
 		t.Fatal(err)
 	}

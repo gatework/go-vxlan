@@ -13,7 +13,6 @@ import (
 
 	"github.com/gatework/go-net-connector/connector"
 	vxlan "github.com/gatework/go-vxlan"
-	changepkg "github.com/gatework/go-vxlan/change"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
@@ -49,7 +48,7 @@ func TestApplyBoundaries(t *testing.T) {
 			after := before + "  ip address 192.0.2.254/24\n"
 			config := normalize(nxos.ParseConfig(before, true).Records[0])
 			change := vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"}
-			cp, e := changepkg.NewChangePlan(change)
+			cp, e := newChangePlan(change)
 			if e != nil {
 				t.Fatal(e)
 			}

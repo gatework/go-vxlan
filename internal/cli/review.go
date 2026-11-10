@@ -14,7 +14,6 @@ import (
 	"github.com/gatework/go-vxlan/internal/bootstrap"
 	"github.com/gatework/go-vxlan/internal/workflow"
 	"github.com/gatework/go-vxlan/report"
-	reviewpkg "github.com/gatework/go-vxlan/review"
 )
 
 func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
@@ -36,7 +35,7 @@ func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
 		if e != nil {
 			return a.fail(e)
 		}
-		if e = reviewpkg.ValidateFabricPolicy(policy); e != nil {
+		if e = fabric.ValidatePolicyDocument(policy); e != nil {
 			return a.fail(e)
 		}
 	}

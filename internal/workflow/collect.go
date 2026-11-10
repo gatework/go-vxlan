@@ -2,7 +2,11 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/gatework/go-netops/assess"
+	"github.com/gatework/go-vxlan/fabric"
+	"github.com/gatework/go-vxlan/rules"
 	"path/filepath"
 	"sync"
 	"time"
@@ -10,7 +14,6 @@ import (
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/report"
-	reviewpkg "github.com/gatework/go-vxlan/review"
 )
 
 type CollectionState uint8
@@ -42,7 +45,7 @@ type CollectionOptions struct {
 	Directory            string
 	Workers              int
 	Policy               vxlan.Record
-	Queries              reviewpkg.QueryCatalog
+	Queries              Queries
 	Scripts, Verbose     bool
 	InitialOutputFailure bool
 	Collect              func(context.Context, vxlan.Record) (vxlan.Snapshot, error)
@@ -156,7 +159,7 @@ func Collect(ctx context.Context, o CollectionOptions) CollectionResult {
 		delete(body, "report_saved")
 		doc, err := vxlan.NewEvidenceDocument(body)
 		if err == nil {
-			doc["recommendations"], err = reviewpkg.Advice(doc, o.Queries, scripts, nil)
+			doc["assessment"], err = deviceAssessment(finalizeCtx, doc, o.Queries)
 		}
 		if err == nil {
 			err = r.PublishCollectionDevice(finalizeCtx, doc, res)
@@ -237,4 +240,34 @@ func Collect(ctx context.Context, o CollectionOptions) CollectionResult {
 		return CollectionResult{State: CollectionComplete, Summary: summary, Directory: r.Directory}
 	}
 	return CollectionResult{State: CollectionPartial, Summary: summary, Directory: r.Directory}
+}
+
+// deviceAssessment runs the per-device rules on one collected document and
+// returns the result as a JSON value for the evidence document.
+func deviceAssessment(ctx context.Context, doc vxlan.Record, queries Queries) (any, error) {
+	device, err := fabric.EncodeDocument(doc)
+	if err != nil {
+		return nil, err
+	}
+	model, err := fabric.Build([]*fabric.Device{device}, nil)
+	if err != nil {
+		return nil, err
+	}
+	var commands rules.Commands
+	if queries != nil {
+		commands = queries
+	}
+	assessor, err := rules.NewAssessor(assess.Policy{}, commands)
+	if err != nil {
+		return nil, err
+	}
+	r, err := assessor.Assess(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(r.Devices[0])
+	if err != nil {
+		return nil, err
+	}
+	return vxlan.DecodeDocument(body)
 }

@@ -9,10 +9,10 @@ import (
 	"github.com/spf13/pflag"
 
 	vxlan "github.com/gatework/go-vxlan"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
 	"github.com/gatework/go-vxlan/internal/workflow"
 	"github.com/gatework/go-vxlan/report"
-	reviewpkg "github.com/gatework/go-vxlan/review"
 )
 
 const baselineHeader = `# Fabric 基线（schema_version 1）：由当前采集的多数值生成，仅为待审核草案。
@@ -36,7 +36,7 @@ func (a *App) baseline(ctx context.Context, f *pflag.FlagSet) int {
 	if policy, e = bootstrap.ReadYAML(ctx, bootstrap.Absolute(flagString(f, "fabric-policy"), a.CWD, a.Home)); e != nil {
 		return a.fail(e)
 	}
-	if e = reviewpkg.ValidateFabricPolicy(policy); e != nil {
+	if e = fabric.ValidatePolicyDocument(policy); e != nil {
 		return a.fail(e)
 	}
 	b, e := workflow.DeriveBaseline(ctx, sources, policy)

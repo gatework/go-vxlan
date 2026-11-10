@@ -73,7 +73,8 @@ def main():
             '_ "github.com/gatework/go-vxlan/collect"; '
             '_ "github.com/gatework/go-vxlan/configuration"; '
             '_ "github.com/gatework/go-vxlan/change"; '
-            '_ "github.com/gatework/go-vxlan/review")\n'
+            '_ "github.com/gatework/go-vxlan/fabric"; '
+            '_ "github.com/gatework/go-vxlan/rules")\n'
             'func main(){o,e:=nxos.ParseConfigChecked("hostname LEAF\\n",true);'
             'if e!=nil||!o.Complete(){panic("parse failed")};fmt.Println(o)}\n'
         )

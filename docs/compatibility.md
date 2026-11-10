@@ -10,9 +10,9 @@
 | RuntimeParser / NXOS profile | `nxos.ParseRuntime`、`Profile.Queries`、`parser.Registry` | 11 类、727 条金样；5816 次独立运行态变体差分；型号覆盖、注册表独立复制 |
 | BGPNeighbors / PrefixListReferences / AclPolicy | `BGPNeighbors`、`PrefixListReferences`、`ACLRules`、`ResolveACLPolicy`、`ACLBindings` | 继承、引用、规则与依赖事实 |
 | Service / SubnetIndex | `ServiceCatalog`、`EffectiveNVEMember`、`ServiceRouteTargets`、`ServiceTenant`、`InferServiceMapping`、`NewSubnetIndex` | 映射歧义、租户、路由目标、前缀重叠；增长测试 |
-| Fabric scope/review | `ValidateFabricPolicy`、`ReviewFabric` | 明确部署范围、缺失事实、角色阻断、业务/ACL/网关/传输诊断 |
+| Fabric scope/review | `fabric.ValidatePolicyDocument`、`rules` 规则目录 | 明确部署范围、缺失事实、角色阻断、业务/ACL/网关/传输诊断；`rules/parity_test.go` 回放全部 fabric/recommendations 金样 |
 | Recommendations | `Recommendations`、`CombineRecommendations` | 分类、阻断、候选条件及修复关联 |
-| ChangePlan | `NewChangePlan`、`CandidateChangePlan`；`Eligible`、`Satisfied` | 三种动作、命令/条件回退、漂移和读回条件；领域合计 311 金样 |
+| ChangePlan | `change.DecodeChange`；`Eligible`、`Satisfied`、`Preserved` | 三种动作、命令/条件回退、漂移和读回条件；build/eligible/satisfied 金样与 `testdata/typed/change-oracle.json` 冻结判定 |
 | Collector | `collect.Collect`、`collect.CollectSession`、`netconnector.Open` | 配置优先；明确传输回执；准备命令；空表证据；独立失败；关闭失败；不重连重放 |
 | collect | `cmd/vxlan` / `internal/cli` | 静态/动态清单、过滤、预览、并发、取消、逐设备发布、摘要；本地 HTTP 测试 |
 | parse | `vxlan parse` | file/stdin、维度、model、complete、JSON；非法维度先拒绝；中断 stdin |

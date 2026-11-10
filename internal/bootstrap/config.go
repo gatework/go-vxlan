@@ -15,7 +15,6 @@ import (
 	ncconfig "github.com/gatework/go-net-connector/config"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
@@ -334,7 +333,7 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 		if e != nil {
 			return c, e
 		}
-		if e = review.ValidateFabricPolicy(m); e != nil {
+		if e = fabric.ValidatePolicyDocument(m); e != nil {
 			return c, e
 		}
 		c.Policy = m

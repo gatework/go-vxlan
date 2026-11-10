@@ -1,13 +1,17 @@
 package configuration_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/configuration"
-	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/fabric"
+	"github.com/gatework/go-vxlan/rules"
+
+	"github.com/gatework/go-netops/assess"
 	"github.com/gatework/go-vxlan/vendors"
 )
 
@@ -60,17 +64,35 @@ func BenchmarkServiceCatalog(b *testing.B) {
 	}
 }
 
-func BenchmarkFabricReview(b *testing.B) {
+func BenchmarkFabricAssessment(b *testing.B) {
 	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	assessor, err := rules.NewAssessor(assess.Policy{}, profile)
 	if err != nil {
 		b.Fatal(err)
 	}
 	for _, devices := range []int{4, 16, 64} {
 		b.Run(fmt.Sprintf("devices=%d", devices), func(b *testing.B) {
 			_, documents, policy := benchmarkFabric(devices, 16)
+			var ds []*fabric.Device
+			for _, doc := range documents {
+				d, err := fabric.EncodeDocument(doc)
+				if err != nil {
+					b.Fatal(err)
+				}
+				ds = append(ds, d)
+			}
+			body, _ := json.Marshal(policy)
+			p, _ := fabric.DecodePolicy(body)
+			m, err := fabric.Build(ds, &p)
+			if err != nil {
+				b.Fatal(err)
+			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := review.ReviewFabric(documents, policy, profile); err != nil {
+				if _, err := assessor.Assess(b.Context(), m); err != nil {
 					b.Fatal(err)
 				}
 			}

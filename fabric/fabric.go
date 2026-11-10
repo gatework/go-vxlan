@@ -2,6 +2,7 @@ package fabric
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -48,6 +49,18 @@ func DecodePolicy(body []byte) (Policy, error) {
 		return Policy{}, fmt.Errorf("%w: %w", ErrPolicy, err)
 	}
 	return p, p.Validate()
+}
+
+// ValidatePolicyDocument validates a policy already decoded from YAML or
+// JSON, such as a configuration value, with the same strict rules as
+// DecodePolicy.
+func ValidatePolicyDocument(v any) error {
+	body, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPolicy, err)
+	}
+	_, err = DecodePolicy(body)
+	return err
 }
 
 // Validate enforces explicit, unique, canonical membership with at least

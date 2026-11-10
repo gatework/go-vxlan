@@ -13,7 +13,6 @@ import (
 	"github.com/gatework/go-vxlan/internal/workflow"
 	"github.com/gatework/go-vxlan/parser"
 	"github.com/gatework/go-vxlan/report"
-	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/rules"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
@@ -60,7 +59,7 @@ func TestFabricReviewUsesSelectedVerificationQueries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var queries review.QueryCatalog = profile
+			var queries workflow.Queries = profile
 			if test.noCatalog {
 				queries = nil
 			}
@@ -83,41 +82,42 @@ func TestFabricReviewUsesSelectedVerificationQueries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			found := 0
-			for _, audit := range record.Rows(plan["audits"]) {
-				for _, item := range record.Rows(audit["items"]) {
-					if item["category"] != "fabric" {
-						continue
-					}
-					found++
-					if !slices.Equal(record.StringSlice(item["verify"]), test.commands) {
-						t.Fatalf("fabric verification ignored selected profile: %v", item["verify"])
-					}
-					if len(test.commands) == 0 {
-						if item["status"] != "blocked" || item["change"] != nil || len(record.List(item["commands"])) != 0 || len(record.List(item["rollback"])) != 0 || len(record.List(item["blockers"])) == 0 {
-							t.Fatalf("missing verification authorized change: %v", item)
-						}
-					} else if item["status"] != "candidate" {
-						t.Fatalf("valid verification blocked existing candidate: %v", item)
-					}
-				}
-			}
-			if found != 1 {
-				t.Fatalf("fabric findings changed: %d", found)
-			}
 			changes := record.Map(plan["changes"])
-			if len(test.commands) == 0 && len(changes) != 0 {
-				t.Fatal("missing verification created executable plans")
-			}
-			if len(test.commands) > 0 {
+			if len(test.commands) == 0 {
+				if len(changes) != 0 {
+					t.Fatal("missing verification created executable plans")
+				}
+			} else {
 				if len(changes) != 1 {
 					t.Fatalf("candidate plan count: %d", len(changes))
 				}
 				for _, change := range changes {
 					if !slices.Equal(record.StringSlice(record.Map(change)["verify"]), test.commands) {
-						t.Fatal("plan verification differs from advice")
+						t.Fatal("plan verification ignored the selected profile")
 					}
 				}
+			}
+			raw, err := os.ReadFile(filepath.Join(r.Directory, "assessment.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var assessment rules.Report
+			if err := json.Unmarshal(raw, &assessment); err != nil {
+				t.Fatal(err)
+			}
+			increments := 0
+			for _, fa := range assessment.Fabrics {
+				for _, f := range fa.Assessment.Findings {
+					if f.Rule == rules.IncrementRuleID {
+						increments++
+						if !slices.Equal(f.Verify, test.commands) {
+							t.Fatalf("increment verification: %v", f.Verify)
+						}
+					}
+				}
+			}
+			if increments != len(changes) {
+				t.Fatalf("%d increment findings for %d plans", increments, len(changes))
 			}
 		})
 	}

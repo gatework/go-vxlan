@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/gatework/go-vxlan/vendors"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,9 +12,8 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	changepkg "github.com/gatework/go-vxlan/change"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/report"
-	"github.com/gatework/go-vxlan/review"
 )
 
 func evidenceBatch(t *testing.T, body string) string {
@@ -35,17 +33,12 @@ func TestEvidenceNumbers(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
-	advice, e := review.Advice(sources[0].Document, profile, false, nil)
+	device, e := fabric.EncodeDocument(sources[0].Document)
 	if e != nil {
 		t.Fatal(e)
 	}
-	encoded, e := json.Marshal(advice)
-	if e != nil {
-		t.Fatal(e)
-	}
-	if !strings.Contains(string(encoded), "9007199254740993") {
-		t.Fatalf("evidence number changed: %s", encoded)
+	if len(device.BGPNeighbors) != 1 || device.BGPNeighbors[0].MessagesReceived.String() != "9007199254740993" {
+		t.Fatalf("evidence number changed: %+v", device.BGPNeighbors)
 	}
 }
 func TestDuplicateEvidenceKeys(t *testing.T) {
@@ -77,7 +70,7 @@ func TestNormalizationNumbers(t *testing.T) {
 
 func TestDuplicatePlanKeys(t *testing.T) {
 	change := vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"}
-	cp, e := changepkg.NewChangePlan(change)
+	cp, e := newChangePlan(change)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -99,7 +92,7 @@ func TestDuplicatePlanKeys(t *testing.T) {
 
 func TestFractionalPlanIdentities(t *testing.T) {
 	change := vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"}
-	cp, e := changepkg.NewChangePlan(change)
+	cp, e := newChangePlan(change)
 	if e != nil {
 		t.Fatal(e)
 	}

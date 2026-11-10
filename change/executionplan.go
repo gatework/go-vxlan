@@ -35,7 +35,9 @@ func NewExecutionPlan(body []byte, itemID string) (*ExecutionPlan, error) {
 		return nil, ErrExecutionPlan
 	}
 	document, err := vxlan.DecodeDocument(body)
-	if err != nil || !record.Integer(document["schema_version"], 2, 2) || document["platform"] != "cisco_nxos" {
+	// plan.json schema 2 (legacy review) and 3 (typed review) share the
+	// changes format; both remain executable.
+	if err != nil || !record.Integer(document["schema_version"], 2, 3) || document["platform"] != "cisco_nxos" {
 		return nil, ErrExecutionPlan
 	}
 	item, ok := record.Map(document["changes"])[itemID].(vxlan.Record)

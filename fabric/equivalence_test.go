@@ -248,3 +248,29 @@ func TestUnmodeledFieldDowngradesDimension(t *testing.T) {
 		t.Fatalf("unmodeled field accepted: %+v", d)
 	}
 }
+
+// Statements no corpus fixture exercises, checked against the model so a
+// real device emitting them is not downgraded to unmodeled_fact.
+func TestRareStatementsAreModeled(t *testing.T) {
+	text := "hostname LEAF-01\nfeature nv overlay\ninterface nve1\n  no shutdown\n  host-reachability protocol bgp\n  source-interface loopback1\n  global mcast-group 239.1.1.1\n  member vni 10010\ninterface Ethernet1/1\n  channel-group 10 mode active\nvpc domain 10\n  virtual peer-link destination 10.0.0.2 source 10.0.0.1 dscp 56\n"
+	o, err := nxos.ParseConfigChecked(text, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := fabric.NewDevice(fabric.Identity{Host: "192.0.2.1"}, map[evidence.Dimension]fabric.Observed{fabric.DimConfiguration: observed(t, o)})
+	for _, i := range d.Issues[fabric.DimConfiguration] {
+		if i.Code == fabric.IssueUnmodeled {
+			t.Fatalf("unmodeled: %s", i.Detail)
+		}
+	}
+	if d.Configuration == nil {
+		t.Fatalf("no configuration: %+v", o.Issues)
+	}
+	if err := lossless(generic(t, o.Records[0]), generic(t, d.Configuration), "configuration"); err != nil {
+		t.Fatal(err)
+	}
+	c := d.Configuration
+	if c.NVE.MulticastGroup == "" || c.Interfaces["Ethernet1/1"].ChannelGroup == nil || c.VPCDomain == nil || c.VPCDomain.VirtualPeerLink["dscp"] != "56" {
+		t.Fatalf("rare statements not captured: nve=%+v vpc=%+v issues=%v", c.NVE, c.VPCDomain, o.Issues)
+	}
+}

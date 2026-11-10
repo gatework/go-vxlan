@@ -100,7 +100,8 @@ type NVE struct {
 	SourceInterface      string               `json:"source_interface,omitempty"`
 	HostReachability     string               `json:"host_reachability,omitempty"`
 	AdvertiseVirtualRMAC bool                 `json:"advertise_virtual_rmac,omitempty"`
-	Members              map[string]NVEMember `json:"members"` // VNI -> member
+	MulticastGroup       string               `json:"multicast_group,omitempty"` // global mcast-group
+	Members              map[string]NVEMember `json:"members"`                   // VNI -> member
 }
 
 // NVEMember is one "member vni" under nve1.

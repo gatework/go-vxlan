@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"github.com/gatework/go-netops/assess"
 	"math"
 	"net/netip"
 	"os"
@@ -50,6 +51,16 @@ func Absolute(p, base, home string) string {
 		return filepath.Clean(p)
 	}
 	return filepath.Join(base, p)
+}
+
+// ReadRulesPolicy reads an assessment rule policy: rule switches,
+// severity overrides and thresholds, validated later against the catalog.
+func ReadRulesPolicy(ctx context.Context, path string) (assess.Policy, error) {
+	b, _, e := ncconfig.ReadFile(ctx, path, false)
+	if e != nil {
+		return assess.Policy{}, e
+	}
+	return assess.DecodePolicy(b)
 }
 func ReadYAML(ctx context.Context, path string) (vxlan.Record, error) {
 	b, _, e := ncconfig.ReadFile(ctx, path, false)

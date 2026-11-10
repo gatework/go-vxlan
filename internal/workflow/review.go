@@ -5,6 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/gatework/go-netops/assess"
+	"github.com/gatework/go-vxlan/fabric"
+	"github.com/gatework/go-vxlan/rules"
 	"path/filepath"
 	"strings"
 
@@ -18,8 +21,11 @@ import (
 
 // ReviewOptions binds checked evidence and a command catalog to a review run.
 type ReviewOptions struct {
-	Sources             []report.Source
-	Policy              vxlan.Record
+	Sources []report.Source
+	Policy  vxlan.Record
+	// Rules tunes the schema 3 risk assessment; the zero value runs every
+	// rule with its defaults.
+	Rules               assess.Policy
 	Queries             review.QueryCatalog
 	Scripts, Standalone bool
 }
@@ -33,6 +39,10 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	documents := []vxlan.Record{}
 	for _, s := range sources {
 		documents = append(documents, s.Document)
+	}
+	assessment, err := assessSources(ctx, sources, policy, options)
+	if err != nil {
+		return nil, err
 	}
 	var fabric vxlan.Record
 	if policy != nil {
@@ -119,7 +129,16 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	if err != nil {
 		return nil, err
 	}
-	summary := vxlan.Record{"layout_version": 3, "mode": "review", "status": "incomplete", "review_only": true, "devices": len(entries), "counts": totals, "reports": entries, "plan": "plan.json", "plan_sha256": fmt.Sprintf("%x", sha256.Sum256(body)), "fabric_findings": len(record.List(fabric["findings"]))}
+	assessmentBody, err := json.MarshalIndent(assessment, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	assessmentBody = append(assessmentBody, '\n')
+	riskCounts := map[string]int{}
+	for severity, n := range assessment.Counts {
+		riskCounts[severity.String()] = n
+	}
+	summary := vxlan.Record{"assessment": "assessment.json", "risk_counts": riskCounts, "risk_highest": assessment.Highest.String(), "assessment_incomplete": assessment.Incomplete, "layout_version": 3, "mode": "review", "status": "incomplete", "review_only": true, "devices": len(entries), "counts": totals, "reports": entries, "plan": "plan.json", "plan_sha256": fmt.Sprintf("%x", sha256.Sum256(body)), "fabric_findings": len(record.List(fabric["findings"]))}
 	if len(sources) > 0 {
 		summary["source_batch"] = filepath.Dir(filepath.Dir(sources[0].Path))
 	}
@@ -131,7 +150,7 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	for _, artifact := range []struct {
 		name string
 		body []byte
-	}{{"plan.json", body}, {"plan.json.sha256", []byte(record.String(summary["plan_sha256"]) + "\n")}, {"events.jsonl", []byte(strings.Join(events, "\n") + "\n")}} {
+	}{{"assessment.json", assessmentBody}, {"plan.json", body}, {"plan.json.sha256", []byte(record.String(summary["plan_sha256"]) + "\n")}, {"events.jsonl", []byte(strings.Join(events, "\n") + "\n")}} {
 		if e := r.Publish(ctx, artifact.name, artifact.body); e != nil {
 			return nil, e
 		}
@@ -154,4 +173,42 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	}
 	summary["status"] = "complete"
 	return summary, nil
+}
+
+// assessSources runs the schema 3 rule catalogs over the typed model built
+// from the same sources the legacy review reads.
+func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Record, options ReviewOptions) (rules.Report, error) {
+	devices := make([]*fabric.Device, 0, len(sources))
+	for _, src := range sources {
+		d, err := fabric.EncodeDocument(src.Document)
+		if err != nil {
+			return rules.Report{}, err
+		}
+		devices = append(devices, d)
+	}
+	var membership *fabric.Policy
+	if policy != nil {
+		body, err := json.Marshal(policy)
+		if err != nil {
+			return rules.Report{}, err
+		}
+		p, err := fabric.DecodePolicy(body)
+		if err != nil {
+			return rules.Report{}, err
+		}
+		membership = &p
+	}
+	model, err := fabric.Build(devices, membership)
+	if err != nil {
+		return rules.Report{}, err
+	}
+	var commands rules.Commands
+	if options.Queries != nil {
+		commands = options.Queries
+	}
+	assessor, err := rules.NewAssessor(options.Rules, commands)
+	if err != nil {
+		return rules.Report{}, err
+	}
+	return assessor.Assess(ctx, model)
 }

@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+
 	"fmt"
+	"github.com/gatework/go-netops/assess"
 	"path/filepath"
 
 	"github.com/spf13/pflag"
@@ -16,7 +18,7 @@ import (
 
 func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
 	if flagBool(f, "help") {
-		fmt.Fprintln(a.Output, "用法：vxlan review --batch DIR [--output DIR] [--scripts]\n"+f.FlagUsages())
+		fmt.Fprintln(a.Output, "用法：vxlan review --batch DIR [--output DIR] [--fabric-policy FILE] [--rules-policy FILE] [--scripts]\n"+f.FlagUsages())
 		return 0
 	}
 	if f.NArg() != 0 || flagString(f, "batch") == "" {
@@ -37,6 +39,13 @@ func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
 			return a.fail(e)
 		}
 	}
+	var rulesPolicy assess.Policy
+	if p := flagString(f, "rules-policy"); p != "" {
+		rulesPolicy, e = bootstrap.ReadRulesPolicy(ctx, bootstrap.Absolute(p, a.CWD, a.Home))
+		if e != nil {
+			return a.fail(e)
+		}
+	}
 	out := flagString(f, "output")
 	if out == "" {
 		out = filepath.Join(batch, "reviews")
@@ -49,7 +58,7 @@ func (a *App) review(ctx context.Context, f *pflag.FlagSet) int {
 	if e != nil {
 		return a.fail(e)
 	}
-	_, e = workflow.Review(ctx, r, workflow.ReviewOptions{Sources: sources, Policy: policy, Queries: queries, Scripts: flagBool(f, "scripts") && !flagBool(f, "no-scripts"), Standalone: true})
+	_, e = workflow.Review(ctx, r, workflow.ReviewOptions{Sources: sources, Policy: policy, Rules: rulesPolicy, Queries: queries, Scripts: flagBool(f, "scripts") && !flagBool(f, "no-scripts"), Standalone: true})
 	if e != nil {
 		return a.fail(e)
 	}

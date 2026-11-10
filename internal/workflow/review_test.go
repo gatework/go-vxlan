@@ -7,12 +7,14 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/gatework/go-netops/assess"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/internal/workflow"
 	"github.com/gatework/go-vxlan/parser"
 	"github.com/gatework/go-vxlan/report"
 	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/rules"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
@@ -118,5 +120,61 @@ func TestFabricReviewUsesSelectedVerificationQueries(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestReviewPublishesSchema3Assessment(t *testing.T) {
+	body, err := os.ReadFile("../../testdata/domain/a9109db86d4a3e08663ac2d7c68b40bc4c358bc1d8446f3cea6ff20220a63008.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := vxlan.DecodeDocument(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := record.Map(fixture["input"])
+	var sources []report.Source
+	for _, document := range record.Rows(input["documents"]) {
+		b, _ := json.Marshal(document)
+		sources = append(sources, report.Source{Path: "fixture.json", Body: b, Document: document})
+	}
+	r, err := report.New(filepath.Join(t.TempDir(), "review"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	off := false
+	summary, err := workflow.Review(t.Context(), r, workflow.ReviewOptions{
+		Sources: sources, Policy: record.Map(input["policy"]), Standalone: true,
+		Rules: assess.Policy{Rules: map[assess.RuleID]assess.RulePolicy{"vxlan.fabric_spine_l2": {Enabled: &off}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(r.Directory, "assessment.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, _ := os.Stat(filepath.Join(r.Directory, "assessment.json"))
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("assessment mode %v", info.Mode())
+	}
+	var got rules.Report
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != 3 || len(got.Devices) != len(sources) || len(got.Fabrics) != 1 {
+		t.Fatalf("assessment shape: %+v", got)
+	}
+	disabled := false
+	for _, o := range got.Fabrics[0].Assessment.Rules {
+		if o.Rule == "vxlan.fabric_spine_l2" && o.State == assess.RuleDisabled {
+			disabled = true
+		}
+	}
+	if !disabled || summary["assessment"] != "assessment.json" {
+		t.Fatalf("rule policy or summary link missing: %v", summary)
+	}
+	if _, err := workflow.Review(t.Context(), r, workflow.ReviewOptions{Sources: sources, Rules: assess.Policy{Rules: map[assess.RuleID]assess.RulePolicy{"vxlan.typo": {}}}}); err == nil {
+		t.Fatal("unknown rule in policy accepted")
 	}
 }

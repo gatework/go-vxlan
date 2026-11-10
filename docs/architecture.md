@@ -14,6 +14,8 @@
 | `change` | 三种可执行业务增量、NX-OS 渲染、不可变 ExecutionPlan、写前与读后验证；不连接设备 |
 | `report` | 私有文件、精确 JSON、报告文本、原子发布和执行检查点；不决定业务候选 |
 | `adapter/netconnector` | Connector 回执、操作 context、采集/配置会话适配；保留传输生命周期错误 |
+| `fabric` | 类型化 VXLAN/EVPN 领域模型（配置、运行态、设备、Fabric 成员与角色、L2 服务视图）；严格解码解析器输出，未知字段使维度降为 partial（`unmodeled_fact`），不静默丢弃事实 |
+| `rules` | 基于 go-netops `assess` 的风险规则目录：设备规则 `Rule[*fabric.Device]` 与 Fabric 规则 `Rule[*fabric.Fabric]`；输出 schema 3 `assessment.json`（严重级别、类别、对象路径、复核命令、修复建议、规则覆盖） |
 | `internal/bootstrap` | YAML/.env/进程环境/CLI 分层、typed request、清单、凭据与依赖组合；复用 Connector 的库存配置 decoder |
 | `internal/workflow` | 批量采集、离线 review；接收明确字段与能力，返回状态、事件与摘要 |
 | `internal/workflow/apply` | 单项执行状态机；写前 intent、ack、回读、独立清理、uncertain 收尾 |
@@ -72,3 +74,14 @@ apply 的可变执行事实由私有 `executionState` 持有：状态、pending 
 `python3 scripts/check-architecture.py` 使用 `go list -json` 的生产导入图，规则覆盖包及其子包：禁止公开 cli、根证据反向依赖、parser 引入 vendor、collect 自选传输、configuration/change 反向依赖，以及业务层直接引入文件/网络/终端库。领域/根包也检查传递依赖，不能通过 helper 隐藏应用或传输反向依赖；标准库 I/O 只检查直接导入，避免误判 fmt 等基础库。workflow 按直接能力边界禁止依赖 bootstrap、CLI、Cobra 或 Connector/Expect。`scripts/test_architecture.py` 用真实临时 Go 包图覆盖禁止、允许及 helper 绕过样例。CI 和独立交付检查都运行门禁与规则测试。
 
 共享 inventory/config 与回执 API 来自正式 Connector v0.6.0；Expect 固定为 v0.5.0。默认构建与独立交付检查使用 `GOWORK=off`，不恢复本地依赖快照。仓库只维护当前架构、迁移与验证文档，旧实施计划及依赖来源记录通过 Git 历史查询。
+
+## 类型化评估（schema 3）
+
+`review` 在既有输出之外发布 `assessment.json`，并在 `summary.json` 中给出 `risk_counts`、`risk_highest` 与 `assessment_incomplete`。评估链路为：设备报告 → `fabric.DecodeDocument` → `fabric.Build`（按 Fabric 策略分配角色）→ `rules.Assessor`（两个 go-netops 引擎，一份规则策略）。
+
+- 证据门禁由引擎统一执行：声明 `Requires` 的规则在证据不完整时记为 `skipped: insufficient_evidence`。运行态状态规则（NVE/BGP/OSPF/vPC/port-channel）从部分表中也会报告已观测到的故障，并在发现项中注明证据状态；`evidence_incomplete` 单独说明无法证明其余部分。
+- 跨设备规则仅在全部声明成员的配置完整时运行，否则只产出 `vxlan.fabric_evidence_incomplete`，避免以部分成员的多数值误判离群设备。一致性规则使用 `drift.Consensus` 指出偏离多数的具体设备；无多数时全部标为 ambiguous。
+- NVE/EVPN 关联修复属于人工脚本（`remediation.status: manual`），不进入自动执行白名单；自动执行仍仅 `svi_acl`、`svi_gateway_add`、`vlan_vni_add`。
+- `--rules-policy FILE` 以 YAML 启用/禁用规则、覆盖严重级别和阈值；未知规则名或参数类型错误直接拒绝。
+
+迁移按"影子运行"推进：已移植的检查由 `rules/parity_test.go` 在全部 `fabric`、`catalog`、`recommendations` 金样上与旧审查逐项对照；旧审查（`review`、`plan.json`）仍是变更计划的来源，未移植的检查（ACL 内容/绑定/依赖、地址组、网关冲突、子网重叠、RT 与租户路由、缺失映射推导）继续由旧审查产出，逐项移植后再下线。

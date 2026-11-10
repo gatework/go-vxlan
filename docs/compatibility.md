@@ -40,3 +40,7 @@
 ## 验证边界
 
 金样与差分是已覆盖输入的证据，不是 NX-OS 全语法证明。2026-10-26 曾对 6 台真实 NX-OS 完成 SSH 只读采集，并与 Ruby 驱动/Collector 回放比对；该历史结果不能外推为新版实机验收。v0.2.0 的远程 CI、公开发布与正式版本消费者已验证，记录见 [验证说明](verification.md)。真实 PostgreSQL、生产配置写入、业务连通性与部署不在本次证据内。apply 测试使用合成会话或本地 PTY，没有下发生产配置。
+
+## 类型化模型等价性
+
+`fabric/equivalence_test.go` 将全部 431 条配置金样与 515 条运行态金样经解析器输出严格解码为类型化模型，并要求重新编码后除 omitempty 省略的零值外无事实丢失或新增；超出 int64 的设备计数器以 `fabric.Counter`（`json.Number`）精确保留。`schema 3` 的 `assessment.json` 为 Go 自有格式，不对应 Ruby 输出。

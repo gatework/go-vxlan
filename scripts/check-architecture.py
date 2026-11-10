@@ -24,7 +24,7 @@ def within(path, roots):
 
 def violations(graph):
     failures = []
-    pure = {"parser", "collect", "configuration", "change", "review", "vendors", "internal/record", "internal/textparse"}
+    pure = {"parser", "collect", "configuration", "change", "review", "vendors", "internal/record", "internal/textparse", "fabric", "rules"}
     forbidden_io = {"os", "io/fs", "net/http", "net/rpc", "database/sql", "path/filepath", "syscall"}
     transport = {"github.com/gatework/go-net-connector", "github.com/gatework/go-expect"}
     terminal = {"github.com/spf13", "golang.org/x/term"}
@@ -44,6 +44,12 @@ def violations(graph):
                 failures.append(f"configuration -> {local}")
             if within(relative, {"change"}) and within(local, {"review"}):
                 failures.append("change -> review")
+            # The typed model and its rule catalog depend only on evidence
+            # and go-netops; they never reach vendors, legacy review or I/O.
+            if within(relative, {"fabric"}) and dependency.startswith(MODULE + "/"):
+                failures.append(f"typed model fabric -> {local}")
+            if within(relative, {"rules"}) and dependency.startswith(MODULE + "/") and not within(local, {"fabric"}):
+                failures.append(f"rule catalog rules -> {local}")
             if within(relative, {"internal/workflow"}) and (
                 within(local, {"internal/cli", "internal/bootstrap", "adapter"})
                 or within(dependency, terminal | transport)

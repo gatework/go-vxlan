@@ -96,6 +96,7 @@ func (a *App) commandFlags(name string) *pflag.FlagSet {
 		for _, k := range []string{"batch", "output", "fabric-policy"} {
 			f.String(k, "", "批次或输出路径")
 		}
+		f.String("rules-policy", "", "风险规则策略 YAML：启用/禁用、严重级别、阈值")
 		f.Bool("scripts", false, "导出候选配置")
 		f.Bool("no-scripts", false, "不导出候选配置")
 	case "apply":

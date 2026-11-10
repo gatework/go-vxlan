@@ -147,3 +147,7 @@ Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明
 ## v0.3.1 依赖更新
 
 采用正式 Connector v0.6.0、Expect v0.5.0。Netdisco 缓存模式在内部调用边界转换为 `netdisco.CacheMode`；配置中的 prefer、refresh、only 取值不变。公开 VXLAN API 与设备命令不变。
+
+## 未发布：类型化模型与风险评估
+
+新增公开包 `fabric`（类型化模型、`DecodeDocument`、`Build`、`Policy`、`Configuration.Services`）与 `rules`（`NewAssessor`、`Assess`、`DeviceRules`、`FabricRules`、`RuleIDs`、`Report`）。依赖 go-netops v0.1.1。既有公开 API、CLI 参数与 `plan.json` 不变；`review` 新增 `--rules-policy`，批次新增 `assessment.json`，`summary.json` 新增 `assessment`、`risk_counts`、`risk_highest`、`assessment_incomplete` 字段。

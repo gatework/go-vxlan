@@ -298,7 +298,7 @@ var subnetConflict = assess.NewRule(assess.RuleMeta{
 		for _, name := range slices.Sorted(maps.Keys(c.Interfaces)) {
 			m := sviName.FindStringSubmatch(name)
 			svi := c.Interfaces[name]
-			if m == nil || !svi.Anycast {
+			if m == nil || !fabric.True(svi.Anycast) {
 				continue
 			}
 			vni := c.VLANVNIs[m[1]]

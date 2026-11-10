@@ -84,7 +84,9 @@ func lossless(original, roundTrip any, path string) error {
 		for k, v := range o {
 			rv, present := r[k]
 			if !present {
-				if zero(v) {
+				// Presence is a fact: an explicit false, "" or empty container
+				// differs from an absent field. Only null may be omitted.
+				if v == nil {
 					continue
 				}
 				return fmt.Errorf("%s.%s: lost %v", path, k, v)
@@ -94,7 +96,7 @@ func lossless(original, roundTrip any, path string) error {
 			}
 		}
 		for k, v := range r {
-			if _, present := o[k]; !present && !zero(v) {
+			if _, present := o[k]; !present && v != nil {
 				return fmt.Errorf("%s.%s: invented %v", path, k, v)
 			}
 		}
@@ -163,7 +165,7 @@ func TestConfigurationFixturesDecodeLosslessly(t *testing.T) {
 			continue
 		}
 		if err := lossless(generic(t, o.Records[0]), generic(t, d.Configuration), "configuration"); err != nil {
-			t.Fatalf("%s: %v", filepath.Base(f), err)
+			t.Errorf("%s: %v", filepath.Base(f), err)
 		}
 		decoded++
 	}
@@ -220,7 +222,7 @@ func TestRuntimeGoldensDecodeLosslessly(t *testing.T) {
 			t.Fatalf("%s: unknown dimension", c.ID)
 		}
 		if err := lossless(generic(t, o.Records), generic(t, typed), c.Name); err != nil {
-			t.Fatalf("%s: %v", c.ID, err)
+			t.Errorf("%s: %v", c.ID, err)
 		}
 		for i, raw := range o.Issues {
 			issue, err := fabric.DecodeIssue(mustJSON(t, raw))

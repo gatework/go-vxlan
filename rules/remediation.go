@@ -39,7 +39,7 @@ func relationRemediation(c *fabric.Configuration, rf fabric.RelationFinding) *as
 	evpn, hasEVPN := c.EVPN[key]
 	switch rf.Code {
 	case "nve_l2_without_evpn":
-		if l2Context(c, vni, vlans) && hasMember && !member.AssociateVRF && member.Replication == "bgp" && !hasEVPN && autoPolicy(c) {
+		if l2Context(c, vni, vlans) && hasMember && member.AssociateVRF != nil && !*member.AssociateVRF && member.Replication == "bgp" && !hasEVPN && autoPolicy(c) {
 			manual(r, evpnAdd(key), evpnRemove(key), "本机现有 L2 EVPN 均采用 RD auto、RT import/export auto；候选沿用此模式，仍需确认本 VNI 的业务意图。")
 		} else {
 			r.Blockers = []string{"需要唯一 VLAN 映射、L2 BGP 复制以及一致的 RD/RT 策略；缺失或冲突时不能套用 auto。"}
@@ -120,7 +120,7 @@ func autoEVPN(e fabric.EVPNInstance) bool {
 func bgpReplication(c *fabric.Configuration) bool {
 	count := 0
 	for _, m := range c.NVE.Members {
-		if m.AssociateVRF {
+		if fabric.True(m.AssociateVRF) {
 			continue
 		}
 		count++

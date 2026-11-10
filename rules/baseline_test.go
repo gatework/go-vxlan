@@ -15,7 +15,7 @@ func gatewayFabric() ([]*fabric.Device, *fabric.Policy) {
 	for _, d := range devices {
 		mtu := 9216
 		d.Configuration.AnycastMAC = "0001.0001.0001"
-		d.Configuration.Interfaces["Vlan100"] = fabric.Interface{VRF: "tenant", Anycast: true, Addresses: []string{"10.10.0.1/24"}, MTU: &mtu}
+		d.Configuration.Interfaces["Vlan100"] = fabric.Interface{VRF: "tenant", Anycast: new(true), Addresses: []string{"10.10.0.1/24"}, MTU: &mtu}
 		d.Configuration.Operations = &fabric.Operations{NTPServers: []fabric.Server{{Address: "192.0.2.10"}}}
 	}
 	return devices, &fabric.Policy{Fabrics: map[string]fabric.Membership{"dc1": {Leaves: []string{"10.0.0.11", "10.0.0.12"}}}}

@@ -256,7 +256,11 @@ var vpcPeer = stateRule("vxlan.vpc_peer_unhealthy", "vPC 对等体、keepalive �
 	if v == nil {
 		return nil
 	}
-	subject := device(d).Child("vpc_domain", strconv.Itoa(v.DomainID))
+	domain := "-"
+	if v.DomainID != nil {
+		domain = strconv.Itoa(*v.DomainID)
+	}
+	subject := device(d).Child("vpc_domain", domain)
 	var out []assess.Finding
 	check := func(field, actual, expected string) {
 		if actual != "" && !strings.EqualFold(actual, expected) {

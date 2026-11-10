@@ -80,7 +80,7 @@ func TestRuntimeDeviceRules(t *testing.T) {
 			{VRF: "default", PeerIP: "10.255.0.2", State: "established", PrefixesReceived: counter("0")},
 			{VRF: "default", PeerIP: "10.255.0.3", State: "Idle"},
 		},
-		VPC: &fabric.VPC{DomainID: 10, PeerStatus: "peer adjacency formed ok", KeepaliveStatus: "Suspended as per user request", ConsistencyStatus: "success",
+		VPC: &fabric.VPC{DomainID: new(10), PeerStatus: "peer adjacency formed ok", KeepaliveStatus: "Suspended as per user request", ConsistencyStatus: "success",
 			PeerLinks: []fabric.VPCPeerLink{{ID: "1", Interface: "Po100", State: "up"}},
 			Members: []fabric.VPCMember{
 				{ID: "10", Interface: "Po10", State: "up", Consistency: "success"},
@@ -202,7 +202,7 @@ func TestConsensusNamesTheOutlier(t *testing.T) {
 			m = 1500
 			d.Configuration.AnycastMAC = "0002.0002.0002"
 		}
-		d.Configuration.Interfaces["Vlan100"] = fabric.Interface{VRF: "tenant", Anycast: true, Addresses: []string{"10.10.0.1/24"}, MTU: mtu(m)}
+		d.Configuration.Interfaces["Vlan100"] = fabric.Interface{VRF: "tenant", Anycast: new(true), Addresses: []string{"10.10.0.1/24"}, MTU: mtu(m)}
 	}
 	policy := &fabric.Policy{Fabrics: map[string]fabric.Membership{"dc1": {Leaves: []string{"10.0.0.11", "10.0.0.12", "10.0.0.13"}}}}
 	r := run(t, devices, policy)

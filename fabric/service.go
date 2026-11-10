@@ -22,7 +22,9 @@ type Service struct {
 func (s Service) Complete() bool { return len(s.Missing) == 0 }
 
 // Gateway reports whether the service has a routed SVI.
-func (s Service) Gateway() bool { return s.SVI != nil && (s.SVI.Anycast || len(s.SVI.Addresses) > 0) }
+func (s Service) Gateway() bool {
+	return s.SVI != nil && (True(s.SVI.Anycast) || len(s.SVI.Addresses) > 0)
+}
 
 // L3VNIs returns VNIs bound to VRFs or used as L3 by NVE or EVPN.
 func (c *Configuration) L3VNIs() map[int]bool {
@@ -38,7 +40,7 @@ func (c *Configuration) L3VNIs() map[int]bool {
 		}
 	}
 	for k, m := range c.NVE.Members {
-		if n, err := strconv.Atoi(k); err == nil && m.AssociateVRF {
+		if n, err := strconv.Atoi(k); err == nil && True(m.AssociateVRF) {
 			l3[n] = true
 		}
 	}
@@ -52,7 +54,7 @@ func (c *Configuration) EffectiveMember(vni int) *NVEMember {
 	if !ok {
 		return nil
 	}
-	if c.NVE.MulticastGroup != "" && m.Replication == "" && m.MulticastGroup == "" && !m.AssociateVRF {
+	if c.NVE.MulticastGroup != "" && m.Replication == "" && m.MulticastGroup == "" && !True(m.AssociateVRF) {
 		m.MulticastGroup = c.NVE.MulticastGroup
 	}
 	return &m
@@ -70,7 +72,7 @@ func (c *Configuration) Services() []Service {
 		}
 	}
 	for k, m := range c.NVE.Members {
-		if n, err := strconv.Atoi(k); err == nil && !m.AssociateVRF {
+		if n, err := strconv.Atoi(k); err == nil && !True(m.AssociateVRF) {
 			l2[n] = true
 		}
 	}
@@ -104,7 +106,7 @@ func (c *Configuration) Services() []Service {
 			switch {
 			case s.Member == nil:
 				s.Missing = append(s.Missing, "NVE")
-			case s.Member.AssociateVRF:
+			case True(s.Member.AssociateVRF):
 				s.Missing = append(s.Missing, "NVE L2")
 			}
 			if e, ok := c.EVPN[strconv.Itoa(vni)]; ok {

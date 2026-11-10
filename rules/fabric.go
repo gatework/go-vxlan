@@ -255,7 +255,12 @@ var sviAttributes = assess.NewRule(assess.RuleMeta{
 		}
 		var out []assess.Finding
 		out = append(out, consensus(f, role, vni, "svi.vrf", vlanRows, svi(func(i *fabric.Interface) (string, bool) { return i.VRF, i.VRF != "" }))...)
-		out = append(out, consensus(f, role, vni, "svi.anycast", vlanRows, svi(func(i *fabric.Interface) (string, bool) { return strconv.FormatBool(i.Anycast), true }))...)
+		out = append(out, consensus(f, role, vni, "svi.anycast", vlanRows, svi(func(i *fabric.Interface) (string, bool) {
+			if i.Anycast == nil {
+				return "absent", true
+			}
+			return strconv.FormatBool(*i.Anycast), true
+		}))...)
 		out = append(out, consensus(f, role, vni, "svi.mtu", vlanRows, svi(func(i *fabric.Interface) (string, bool) {
 			if i.MTU == nil {
 				return "", false

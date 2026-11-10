@@ -67,6 +67,11 @@ func TestRealConfigurationsAreModeled(t *testing.T) {
 		}
 		statuses[o.Status]++
 		d := fabric.NewDevice(fabric.Identity{Host: "192.0.2.1"}, map[evidence.Dimension]fabric.Observed{fabric.DimConfiguration: observed(t, o)})
+		if len(o.Records) == 1 {
+			if err := lossless(generic(t, o.Records[0]), generic(t, d.Configuration), "configuration"); err != nil {
+				t.Errorf("real configuration not decoded losslessly: %v", err)
+			}
+		}
 		for _, i := range d.Issues[fabric.DimConfiguration] {
 			issues[i.Code]++
 			if i.Code == fabric.IssueUnmodeled {

@@ -82,11 +82,11 @@ type Interface struct {
 	Shutdown            *bool             `json:"shutdown,omitempty"`
 	MTU                 *int              `json:"mtu,omitempty"`
 	VRF                 string            `json:"vrf,omitempty"`
-	Addresses           []string          `json:"addresses,omitempty"`
-	Anycast             bool              `json:"anycast,omitempty"`
+	Addresses           []string          `json:"addresses"`
+	Anycast             *bool             `json:"anycast,omitempty"`
 	IPForward           bool              `json:"ip_forward,omitempty"`
 	UnnumberedInterface string            `json:"unnumbered_interface,omitempty"`
-	ACLBindings         map[string]string `json:"acl_bindings,omitempty"` // direction (in|out) -> ACL
+	ACLBindings         map[string]string `json:"acl_bindings"` // direction (in|out) -> ACL
 	OSPF                string            `json:"ospf,omitempty"`
 	OSPFNetworkType     string            `json:"ospf_network_type,omitempty"`
 	Switchport          *bool             `json:"switchport,omitempty"`
@@ -137,7 +137,7 @@ type NVE struct {
 
 // NVEMember is one "member vni" under nve1.
 type NVEMember struct {
-	AssociateVRF   bool   `json:"associate_vrf,omitempty"`
+	AssociateVRF   *bool  `json:"associate_vrf,omitempty"`
 	Replication    string `json:"replication,omitempty"` // bgp, static, multicast
 	MulticastGroup string `json:"multicast_group,omitempty"`
 	SuppressARP    *bool  `json:"suppress_arp,omitempty"`
@@ -250,7 +250,7 @@ type Segment struct {
 	Prefix      string            `json:"prefix"`
 	Gateway     string            `json:"gateway"`
 	Anycast     bool              `json:"anycast"`
-	ACLBindings map[string]string `json:"acl_bindings,omitempty"`
+	ACLBindings map[string]string `json:"acl_bindings"`
 }
 
 // RelationFinding is a configuration relation problem the parser derived,
@@ -262,3 +262,6 @@ type RelationFinding struct {
 	EVPNType string `json:"evpn_type,omitempty"`
 	VLANIDs  []int  `json:"vlan_ids,omitempty"`
 }
+
+// True reports whether an optional flag is set; absent means false.
+func True(b *bool) bool { return b != nil && *b }

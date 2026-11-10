@@ -42,8 +42,8 @@ type NVEVNI struct {
 type BGPNeighbor struct {
 	VRF              string             `json:"vrf"`
 	AddressFamily    string             `json:"address_family"`
-	RouterID         string             `json:"router_id"`
-	LocalAS          string             `json:"local_as"`
+	RouterID         string             `json:"router_id,omitempty"`
+	LocalAS          string             `json:"local_as,omitempty"`
 	TableVersion     *Counter           `json:"table_version,omitempty"`
 	PeerIP           string             `json:"peer_ip"`
 	Version          Counter            `json:"version"`
@@ -60,8 +60,8 @@ type BGPNeighbor struct {
 
 // OSPFNeighbor is one row of "show ip ospf neighbors".
 type OSPFNeighbor struct {
-	Process    string `json:"process"`
-	VRF        string `json:"vrf"`
+	Process    string `json:"process,omitempty"`
+	VRF        string `json:"vrf,omitempty"`
 	NeighborID string `json:"neighbor_id"`
 	Priority   int    `json:"priority"`
 	State      string `json:"state"`
@@ -76,10 +76,10 @@ type CDPNeighbor struct {
 	NeighborName        string             `json:"neighbor_name"`
 	Interface           string             `json:"interface"`
 	NeighborInterface   string             `json:"neighbor_interface"`
-	Platform            string             `json:"platform"`
-	Capabilities        string             `json:"capabilities"`
+	Platform            string             `json:"platform,omitempty"`
+	Capabilities        string             `json:"capabilities,omitempty"`
 	Holdtime            *Counter           `json:"holdtime,omitempty"`
-	Version             string             `json:"version"`
+	Version             string             `json:"version,omitempty"`
 	InterfaceAddresses  []string           `json:"interface_addresses"`
 	ManagementAddresses []string           `json:"management_addresses"`
 	Attributes          map[string]*string `json:"attributes"`
@@ -108,10 +108,10 @@ type VPCMember struct {
 
 // VPC is "show vpc brief".
 type VPC struct {
-	DomainID          int               `json:"domain_id"`
-	PeerStatus        string            `json:"peer_status"`
-	KeepaliveStatus   string            `json:"keepalive_status"`
-	ConsistencyStatus string            `json:"consistency_status"`
+	DomainID          *int              `json:"domain_id,omitempty"`
+	PeerStatus        string            `json:"peer_status,omitempty"`
+	KeepaliveStatus   string            `json:"keepalive_status,omitempty"`
+	ConsistencyStatus string            `json:"consistency_status,omitempty"`
 	Role              string            `json:"role,omitempty"`
 	Attributes        map[string]string `json:"attributes"`
 	PeerLinks         []VPCPeerLink     `json:"peer_links"`
@@ -173,7 +173,7 @@ type L2RouteNextHop struct {
 	Interface string `json:"interface,omitempty"`
 	IfIndex   *int   `json:"ifindex,omitempty"`
 	Label     *int   `json:"label,omitempty"`
-	Local     bool   `json:"local"`
+	Local     *bool  `json:"local,omitempty"`
 }
 
 // L2RouteMAC is one row of "show l2route evpn mac all".
@@ -181,8 +181,8 @@ type L2RouteMAC struct {
 	TopologyID int              `json:"topology_id"`
 	MAC        string           `json:"mac"`
 	Producer   string           `json:"producer"`
-	Flags      string           `json:"flags"`
-	Sequence   int              `json:"sequence"`
+	Flags      string           `json:"flags,omitempty"`
+	Sequence   *int             `json:"sequence,omitempty"`
 	NextHops   []L2RouteNextHop `json:"next_hops"`
 }
 
@@ -192,7 +192,7 @@ type L2RouteMACIP struct {
 	MAC        string           `json:"mac"`
 	HostIP     string           `json:"host_ip"`
 	Producer   string           `json:"producer"`
-	Flags      string           `json:"flags"`
-	Sequence   int              `json:"sequence"`
+	Flags      string           `json:"flags,omitempty"`
+	Sequence   *int             `json:"sequence,omitempty"`
 	NextHops   []L2RouteNextHop `json:"next_hops"`
 }

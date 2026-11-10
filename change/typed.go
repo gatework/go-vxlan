@@ -294,7 +294,7 @@ type SVIACL struct {
 	ACL             string              `json:"acl"`
 	Direction       string              `json:"direction"`
 	Entries         []fabric.ACLEntry   `json:"entries"`
-	AddressGroups   map[string][]string `json:"address_groups,omitempty"`
+	AddressGroups   map[string][]string `json:"address_groups"`
 	CreateACL       bool                `json:"create_acl"`
 	PreviousBinding *string             `json:"previous_binding"`
 }

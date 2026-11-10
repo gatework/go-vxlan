@@ -87,7 +87,11 @@ func NewAssessor(policy assess.Policy, commands Commands) (*Assessor, error) {
 	if err != nil {
 		return nil, err
 	}
-	fabricCatalog, err := assess.NewCatalog(FabricRules()...)
+	var verifier Verifier
+	if v, ok := commands.(Verifier); ok {
+		verifier = v
+	}
+	fabricCatalog, err := assess.NewCatalog(append(FabricRules(), incrementRule(verifier))...)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +244,7 @@ func RuleIDs() []assess.RuleID {
 	for _, r := range FabricRules() {
 		ids = append(ids, r.Meta().ID)
 	}
+	ids = append(ids, IncrementRuleID)
 	for _, r := range BaselineRules() {
 		ids = append(ids, r.Meta().ID)
 	}

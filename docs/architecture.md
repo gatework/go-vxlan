@@ -97,3 +97,9 @@ apply 的可变执行事实由私有 `executionState` 持有：状态、pending 
 `vendors/nxos` 的只读提取在配置记录中增加 `operations`：NTP/日志/TACACS/SNMP 服务器（不含密钥与 community）、NVE infra VLAN、VLAN 名称、trunk 放行列表、SVI DHCP 中继、fabric 端口与 vPC 域选项。提取不改变行状态与既有字段，Ruby 金样比较时剔除该字段。
 
 `VXLAN_REAL_CORPUS=<目录>` 启用真实配置回归（`fabric/realcorpus_test.go`、`rules/realcorpus_test.go`）：全部配置须完整解析并无损建模，类型化规则须与旧审查逐项一致，派生基线须可往返，同批自比较须无变化。测试只输出聚合统计，设备数据不进入仓库。
+
+## 可执行增量（类型化）
+
+`change` 中的 `SVIGateway`、`VLANVNI`、`SVIACL` 实现 go-netops `change.Change` 与 `Preserving`：命令、回退、准入（Eligible）、回读（Satisfied）与"除目标外配置未变"（Preserved）均与旧 `ChangePlan` 一致。`rules.Increments` 复现旧 Fabric 审查的增量推导（网关、ACL、缺失 VLAN 映射；承载冲突、网段冲突、角色冲突与缺少验证命令时不推导），审查流程据此生成 `plan.json` 的 `changes`，计划 ID、字段与执行计划校验不变；`assessment.json` 以 `vxlan.remediation_increment` 发现项附带候选修复。
+
+类型化模型保留字段存在性：显式 false、空列表/空映射与缺失字段不同，回读保护与旧实现同样严格。等价性由三层测试保证：build/eligible/satisfied 金样；以金样为种子的 7425 次配置变异差分；Fabric 金样与真实配置（`VXLAN_REAL_CORPUS`）上 `plan.json` changes 与旧推导逐字节一致。旧推导保留在测试中作为参照，直至旧审查下线。

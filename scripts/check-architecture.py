@@ -42,13 +42,14 @@ def violations(graph):
                 failures.append(f"collect must consume the selected profile, not {local}")
             if within(relative, {"configuration"}) and within(local, {"change", "review"}):
                 failures.append(f"configuration -> {local}")
-            if within(relative, {"change"}) and within(local, {"review"}):
+            if within(relative, {"change"}) and within(local, {"review", "rules"}):
                 failures.append("change -> review")
             # The typed model and its rule catalog depend only on evidence
             # and go-netops; they never reach vendors, legacy review or I/O.
             if within(relative, {"fabric"}) and dependency.startswith(MODULE + "/"):
                 failures.append(f"typed model fabric -> {local}")
-            if within(relative, {"rules"}) and dependency.startswith(MODULE + "/") and not within(local, {"fabric"}):
+            # Rules may propose typed changes; change never depends on rules.
+            if within(relative, {"rules"}) and dependency.startswith(MODULE + "/") and not within(local, {"fabric", "change"}):
                 failures.append(f"rule catalog rules -> {local}")
             if within(relative, {"internal/workflow"}) and (
                 within(local, {"internal/cli", "internal/bootstrap", "adapter"})

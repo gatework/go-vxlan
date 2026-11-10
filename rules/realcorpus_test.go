@@ -17,6 +17,7 @@ import (
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/rules"
+	"github.com/gatework/go-vxlan/vendors"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
@@ -212,4 +213,33 @@ func TestRealFabricsBaselineAndSelfComparison(t *testing.T) {
 		}
 	}
 	t.Logf("drift from derived (majority) baselines by rule: %v", byRule)
+}
+
+func TestRealFabricIncrementsMatchLegacy(t *testing.T) {
+	verify := profile(t)
+	p, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	total := 0
+	for _, site := range slices.Sorted(maps.Keys(realFabrics(t))) {
+		rf := realFabrics(t)[site]
+		body, _ := json.Marshal(rf.policy)
+		var legacyPolicy vxlan.Record
+		_ = json.Unmarshal(body, &legacyPolicy)
+		legacy, err := review.ReviewFabric(rf.documents, record.Copy(legacyPolicy).(vxlan.Record), p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := legacyCandidates(t, legacy)
+		var devices []*fabric.Device
+		for _, doc := range rf.documents {
+			d, _ := fabric.EncodeDocument(doc)
+			devices = append(devices, d)
+		}
+		m, _ := fabric.Build(devices, &rf.policy)
+		got := typedCandidates(t, m, verify)
+		if missing, extra := diff(want, got), diff(got, want); len(missing)+len(extra) > 0 {
+			t.Errorf("fabric with %d devices: %d missing, %d extra executable increments", len(rf.documents), len(missing), len(extra))
+		}
+		total += len(want)
+	}
+	t.Logf("real legacy executable increments reproduced: %d", total)
 }

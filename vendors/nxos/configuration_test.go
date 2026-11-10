@@ -2,6 +2,7 @@ package nxos
 
 import (
 	"encoding/json"
+	"github.com/gatework/go-vxlan/internal/record"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -48,6 +49,11 @@ func TestConfigRubyCorpus(t *testing.T) {
 			json.Unmarshal(j, &m)
 			delete(m, "started_at")
 			delete(m, "completed_at")
+			// operations is a Go-only extension (see configuration_operations.go)
+			// with its own tests; the Ruby goldens predate it.
+			for _, r := range record.Rows(m["records"]) {
+				delete(r, "operations")
+			}
 			if !reflect.DeepEqual(m, c.Expected) {
 				t.Errorf("input %q\ngot %s\nwant %s", c.Text, j, mustJSON(c.Expected))
 			}

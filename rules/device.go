@@ -34,11 +34,11 @@ func isNotUp(state string) bool { return slices.Contains(notUp, strings.ToLower(
 
 // DeviceRules returns the per-device rules in evaluation order.
 func DeviceRules() []deviceRule {
-	return []deviceRule{
+	return append([]deviceRule{
 		evidenceIncomplete, configRelation, aclUndefined, nveShutdown,
 		nveVNIDown, nvePeerDown, bgpSessionDown, bgpNoPrefixes, ospfNotFull,
 		vpcPeer, vpcMember, portChannelMember,
-	}
+	}, operationDeviceRules()...)
 }
 
 var evidenceIncomplete = assess.NewRule(assess.RuleMeta{

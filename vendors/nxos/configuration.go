@@ -241,6 +241,9 @@ func parseConfig(text string, complete bool, document *ConfigurationDocument) vx
 	s.finalize(d)
 	s.finishSources(d, blocks)
 	d["config_digest"] = digest
+	if ops := extractOperations(blocks); ops != nil {
+		d["operations"] = ops
+	}
 	if !complete {
 		s.issues = append(s.issues, vxlan.Record{"code": "output_incomplete"})
 	}

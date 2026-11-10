@@ -23,7 +23,7 @@ func FabricRules() []fabricRule {
 		fabricEvidence, serviceIncomplete, vlanMappingAmbiguous, vlanMapping,
 		replication, arpSuppression, sviAttributes, anycastMAC, spineL2,
 		nvePeerMissing, duplicateLocalMAC,
-	}, fabricPolicyRules()...)
+	}, slices.Concat(fabricPolicyRules(), operationFabricRules())...)
 }
 
 func fabricSubject(f *fabric.Fabric) assess.Subject { return assess.NewSubject("fabric", f.Name) }
@@ -433,3 +433,17 @@ var duplicateLocalMAC = assess.NewRule(assess.RuleMeta{
 	}
 	return out
 })
+
+type driftMember = drift.Member[string]
+
+// consensusFindings turns consensus deviations into consistency findings.
+func consensusFindings(path string, members []driftMember) []assess.Finding {
+	_, _, devs := drift.Consensus(path, members)
+	out := make([]assess.Finding, 0, len(devs))
+	for _, d := range devs {
+		finding := d.Finding(path + " " + string(d.Kind))
+		finding.Category = assess.CategoryConsistency
+		out = append(out, finding)
+	}
+	return out
+}

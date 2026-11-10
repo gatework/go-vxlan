@@ -35,6 +35,37 @@ type Configuration struct {
 	ConfigDigest        string                      `json:"config_digest"`
 	ReviewStatus        string                      `json:"review_status"`
 	ReviewFindings      []RelationFinding           `json:"review_findings"`
+	Operations          *Operations                 `json:"operations,omitempty"`
+}
+
+// Server is a management or relay server reference.
+type Server struct {
+	Address string `json:"address"`
+	VRF     string `json:"vrf,omitempty"`
+}
+
+// VPCOptions are vPC domain options beyond the relational vPC model.
+type VPCOptions struct {
+	AutoRecovery    bool `json:"auto_recovery,omitempty"`
+	DelayRestore    *int `json:"delay_restore,omitempty"`
+	ARPSynchronize  bool `json:"arp_synchronize,omitempty"`
+	NDSynchronize   bool `json:"nd_synchronize,omitempty"`
+	FastConvergence bool `json:"fast_convergence,omitempty"`
+}
+
+// Operations are operational statements: management servers, trunk and
+// relay settings, vPC options and VLAN names. Credentials are never kept.
+type Operations struct {
+	NTPServers     []Server            `json:"ntp_servers,omitempty"`
+	LoggingServers []Server            `json:"logging_servers,omitempty"`
+	TACACSServers  []Server            `json:"tacacs_servers,omitempty"`
+	SNMPHosts      []Server            `json:"snmp_hosts,omitempty"`
+	NVEInfraVLANs  string              `json:"nve_infra_vlans,omitempty"`
+	VLANNames      map[string]string   `json:"vlan_names,omitempty"`
+	TrunkAllowed   map[string]string   `json:"trunk_allowed,omitempty"` // interface -> range list, "all", "none" or "unknown"
+	DHCPRelays     map[string][]Server `json:"dhcp_relays,omitempty"`   // SVI -> relay servers
+	FabricPorts    []string            `json:"fabric_ports,omitempty"`
+	VPC            *VPCOptions         `json:"vpc,omitempty"`
 }
 
 // Breakout is a port breakout declaration.

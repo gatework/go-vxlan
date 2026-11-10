@@ -321,3 +321,12 @@ func verdictCode(eligible, satisfied bool) string {
 	}
 	return string(code)
 }
+
+func TestACLIncrementRejectsOutOfRangeSequence(t *testing.T) {
+	for _, seq := range []int{0, 4294967296} {
+		body := fmt.Sprintf(`{"kind":"svi_acl","vlan":8,"vni":10008,"acl":"protect","direction":"out","entries":[{"sequence":%d,"action":"permit","expression":"ip any any"}],"create_acl":true,"previous_binding":null}`, seq)
+		if _, err := change.DecodeChange([]byte(body)); err == nil {
+			t.Fatalf("sequence %d accepted", seq)
+		}
+	}
+}

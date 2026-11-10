@@ -9,7 +9,7 @@
 | `vendors/nxos` | NX-OS 配置/运行态语法、来源文档、准备命令及有证据支持的空表策略；`cfgState.finalize` 保留在解析器内 |
 | `vendors` | 显式构造内置 registry；没有 `init` 注册或可变全局 registry |
 | `collect` | 按调用方选定的 profile 借用单设备会话，保留 Capture 与独立错误；不挑选厂商或创建传输 |
-| `configuration` | ACL 依赖/绑定、子网索引、路由策略引用、业务目录与配置关系；不生成变更 |
+| `configuration` | 解析器使用的 VLAN/NVE/EVPN/VRF 配置关系（`review_findings`）与 `CompleteConfig`；ACL 策略、业务目录、网段索引与 RT 展开已移至类型化 `fabric` |
 | `change` | 三种可执行业务增量（类型化 `SVIGateway`/`VLANVNI`/`SVIACL`）、NX-OS 渲染、不可变 ExecutionPlan、写前准入与读后保留校验；不连接设备 |
 | `report` | 私有文件、精确 JSON、报告文本、原子发布和执行检查点；不决定业务候选 |
 | `adapter/netconnector` | Connector 回执、操作 context、采集/配置会话适配；保留传输生命周期错误 |

@@ -84,19 +84,6 @@ func TestCompleteConfigRequiresUniqueCompleteEvidence(t *testing.T) {
 		t.Fatal("partial record accepted")
 	}
 }
-func TestSubnetIndexRetainsItsSnapshot(t *testing.T) {
-	addresses := []string{"192.0.2.129/25"}
-	svi := vxlan.Record{"vrf": "tenant", "addresses": addresses}
-	config := vxlan.Record{"interfaces": vxlan.Record{"Vlan9": svi}, "vlan_vnis": vxlan.Record{"9": 10009}}
-	index := configuration.NewSubnetIndex(config)
-	addresses[0] = "198.51.100.1/24"
-	svi["vrf"] = "other"
-	recordpkg.Map(config["vlan_vnis"])["9"] = 10008
-	conflicts, err := index.Conflicts("192.0.2.254/24", "tenant", 10008, "")
-	if err != nil || len(conflicts) != 1 || conflicts[0]["vni"] != 10009 || recordpkg.StringSlice(conflicts[0]["value"])[0] != "192.0.2.129/25" {
-		t.Fatalf("snapshot changed: %#v %v", conflicts, err)
-	}
-}
 func TestFabricRejectsDuplicateIdentity(t *testing.T) {
 	d := fabric.NewDevice(fabric.Identity{Host: "192.0.2.1"}, nil)
 	policy := &fabric.Policy{Fabrics: map[string]fabric.Membership{"A": {Leaves: []string{"192.0.2.1", "192.0.2.2"}}}}
@@ -108,18 +95,17 @@ func TestFabricRejectsDuplicateIdentity(t *testing.T) {
 func TestSubnetIndexQueryAllocationGrowth(t *testing.T) {
 	allocations := []float64{}
 	for _, count := range []int{128, 512} {
-		config := vxlan.Record{"interfaces": vxlan.Record{}, "vlan_vnis": vxlan.Record{}}
+		c := &fabric.Configuration{Interfaces: map[string]fabric.Interface{}, VLANVNIs: map[string]*int{}}
 		addresses := make([]string, count)
 		for i := 0; i < count; i++ {
-			name := fmt.Sprintf("Vlan%d", i+1)
 			addresses[i] = fmt.Sprintf("10.%d.%d.254/24", i/256, i%256)
-			recordpkg.Map(config["interfaces"])[name] = vxlan.Record{"vrf": "tenant", "addresses": []string{addresses[i]}}
-			recordpkg.Map(config["vlan_vnis"])[strconv.Itoa(i+1)] = 10001 + i
+			c.Interfaces[fmt.Sprintf("Vlan%d", i+1)] = fabric.Interface{VRF: "tenant", Addresses: []string{addresses[i]}}
+			c.VLANVNIs[strconv.Itoa(i+1)] = new(10001 + i)
 		}
-		index := configuration.NewSubnetIndex(config)
+		index := fabric.NewSubnetIndex(c)
 		allocations = append(allocations, testing.AllocsPerRun(1, func() {
 			for i, address := range addresses {
-				conflicts, err := index.Conflicts(address, "tenant", 10001+i, "")
+				conflicts, err := index.Conflicts(address, "tenant", new(10001+i), "")
 				if err != nil || len(conflicts) != 0 {
 					t.Fatalf("unexpected conflicts %v %v", conflicts, err)
 				}
@@ -186,7 +172,7 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 		}))
 	}
 	t.Logf("fabric gateway allocations for 32/128 VNIs: %v", allocations)
-	if allocations[1] >= allocations[0]*20 {
+	if allocations[1] >= allocations[0]*6 {
 		t.Fatalf("fabric gateway allocations grow quadratically: %v", allocations)
 	}
 }

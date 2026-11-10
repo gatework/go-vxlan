@@ -2,8 +2,6 @@ package rules
 
 import (
 	"fmt"
-	"net/netip"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -93,9 +91,11 @@ func Increments(f *fabric.Fabric, verify Verifier) []Increment {
 	var out []Increment
 	groups := servicesByRole(f)
 	commands := verify.VerificationCommands("fabric")
+	indexes := subnetIndexes(f)
+	blocked := transportBlocked(f)
 	for _, role := range []fabric.Role{fabric.RoleLeaf, fabric.RoleBorder} {
 		for _, vni := range sortedKeys(groups[role]) {
-			for _, inc := range vniIncrements(f, vni, groups[role][vni]) {
+			for _, inc := range vniIncrements(f, indexes, blocked[role][vni], vni, groups[role][vni]) {
 				present(&inc, f, role, vni, commands)
 				out = append(out, inc)
 			}
@@ -124,13 +124,13 @@ func newIncrement(host string, source assess.RuleID, c change.Change, cfg *fabri
 	return Increment{Host: host, Source: source, Change: c, Script: script.Commands, Undo: script.Rollback}, true
 }
 
-func vniIncrements(f *fabric.Fabric, vni int, rows []roleService) []Increment {
+func vniIncrements(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex, transport bool, vni int, rows []roleService) []Increment {
 	var out []Increment
 	incomplete := slices.ContainsFunc(rows, func(r roleService) bool { return !r.service.Complete() })
 	if incomplete {
 		for _, r := range rows {
 			if slices.Equal(r.service.Missing, []string{"VLAN"}) {
-				if inc, ok := inferMapping(f, vni, r, rows); ok {
+				if inc, ok := inferMapping(f, indexes, vni, r, rows); ok {
 					out = append(out, inc)
 				}
 			}
@@ -139,87 +139,81 @@ func vniIncrements(f *fabric.Fabric, vni int, rows []roleService) []Increment {
 	if !unambiguous(rows) || len(rows) < 2 {
 		return out
 	}
-	blocked := incomplete || transportConflict(f, vni, rows)
+	blocked := incomplete || transport
 	mapped := mappedRows(rows)
 	if len(mapped) < 2 || !gateways(mapped) || blocked {
 		return out
 	}
-	out = append(out, gatewayIncrements(f, vni, mapped)...)
+	out = append(out, gatewayIncrements(f, indexes, vni, mapped)...)
 	for _, direction := range []string{"in", "out"} {
 		out = append(out, aclIncrements(vni, mapped, direction)...)
 	}
 	return out
 }
 
-// transportConflict reports the legacy transport blockers: replication,
-// ARP suppression, route targets or tenant routing disagree.
-func transportConflict(f *fabric.Fabric, vni int, rows []roleService) bool {
+// transportBlocked evaluates the legacy transport blockers once per
+// derivation: per role and VNI, whether replication, ARP suppression, route
+// targets or tenant routing disagree among the VNI's deployments.
+func transportBlocked(f *fabric.Fabric) map[fabric.Role]map[int]bool {
+	out := map[fabric.Role]map[int]bool{fabric.RoleLeaf: {}, fabric.RoleBorder: {}}
 	in := fabricInput{Model: f}
 	for _, rule := range []fabricRule{replication, arpSuppression, routeTargets, tenantRouting} {
 		for _, finding := range rule.Evaluate(in) {
-			if subjectHasVNI(finding.Subject, vni) && subjectHasDevice(finding.Subject, rows) {
-				return true
+			role, vni, ok := roleVNI(finding.Subject)
+			if ok {
+				out[role][vni] = true
 			}
 		}
 	}
-	return false
+	return out
 }
 
-func subjectHasVNI(s assess.Subject, vni int) bool {
+func roleVNI(s assess.Subject) (fabric.Role, int, bool) {
+	var role fabric.Role
+	vni, found := 0, false
 	for cur := &s; cur != nil; cur = cur.Parent {
-		if cur.Kind == "vni" && cur.Key == strconv.Itoa(vni) {
-			return true
+		switch cur.Kind {
+		case "role":
+			role = fabric.Role(cur.Key)
+		case "vni":
+			if n, err := strconv.Atoi(cur.Key); err == nil {
+				vni, found = n, true
+			}
 		}
 	}
-	return false
+	return role, vni, found && (role == fabric.RoleLeaf || role == fabric.RoleBorder)
 }
 
-func subjectHasDevice(s assess.Subject, rows []roleService) bool {
-	for cur := &s; cur != nil; cur = cur.Parent {
-		if cur.Kind == "device" {
-			return slices.ContainsFunc(rows, func(r roleService) bool { return r.device.Host == cur.Key })
-		}
+// subnetIndexes builds each member's SVI subnet index once per derivation.
+func subnetIndexes(f *fabric.Fabric) map[string]*fabric.SubnetIndex {
+	out := make(map[string]*fabric.SubnetIndex, len(f.Members))
+	for _, d := range f.Members {
+		out[d.Host] = fabric.NewSubnetIndex(d.Configuration)
 	}
-	return false
+	return out
 }
-
-var vlanSVI = regexp.MustCompile(`^Vlan(\d+)$`)
 
 // gatewayConflicts lists SVIs in the same VRF and family, mapped to another
 // VNI, whose prefixes overlap the gateway network, across the fabric.
-func gatewayConflicts(f *fabric.Fabric, vni int, vrf, address, exceptHost, exceptIface string) []string {
-	network, err := netip.ParsePrefix(address)
-	if err != nil {
-		return []string{"invalid"}
-	}
-	network = network.Masked()
+func gatewayConflicts(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex, vni int, vrf, address, exceptHost, exceptIface string) []string {
 	var out []string
 	for _, d := range f.Members {
-		c := d.Configuration
-		for name, iface := range c.Interfaces {
-			m := vlanSVI.FindStringSubmatch(name)
-			if m == nil || iface.VRF != vrf || (d.Host == exceptHost && name == exceptIface) {
-				continue
-			}
-			if mapped := c.VLANVNIs[m[1]]; mapped != nil && *mapped == vni {
-				continue
-			}
-			for _, a := range iface.Addresses {
-				p, err := netip.ParsePrefix(a)
-				if err != nil {
-					return []string{d.Host + " " + name + " invalid"}
-				}
-				if p = p.Masked(); p.Addr().Is4() == network.Addr().Is4() && p.Overlaps(network) {
-					out = append(out, d.Host+" "+name)
-				}
-			}
+		except := ""
+		if d.Host == exceptHost {
+			except = exceptIface
+		}
+		conflicts, err := indexes[d.Host].Conflicts(address, vrf, &vni, except)
+		if err != nil {
+			return []string{d.Host + " invalid"} // unknowable overlap blocks the increment
+		}
+		for _, c := range conflicts {
+			out = append(out, d.Host+" "+c.Interface)
 		}
 	}
-	slices.Sort(out)
-	return slices.Compact(out)
+	return out
 }
 
-func gatewayIncrements(f *fabric.Fabric, vni int, rows []roleService) []Increment {
+func gatewayIncrements(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex, vni int, rows []roleService) []Increment {
 	values := make([]string, len(rows)) // "" for no SVI, sorted joined addresses otherwise
 	hasSVI := make([]bool, len(rows))
 	nonEmpty := map[string]bool{}
@@ -277,7 +271,7 @@ func gatewayIncrements(f *fabric.Fabric, vni int, rows []roleService) []Incremen
 			continue
 		}
 		g := change.SVIGateway{VLAN: *r.service.VLAN, VNI: vni, VRF: r.service.SVI.VRF, Address: address}
-		if len(gatewayConflicts(f, vni, g.VRF, address, "", "")) > 0 {
+		if len(gatewayConflicts(f, indexes, vni, g.VRF, address, "", "")) > 0 {
 			continue
 		}
 		if inc, ok := newIncrement(r.device.Host, "vxlan.fabric_gateway", g, r.device.Configuration); ok {
@@ -413,7 +407,7 @@ func deref(b *bool) any {
 // one gateway signature and identical transport; exactly one unmapped VLAN
 // on the device carries that signature; the gateway does not overlap other
 // VNIs anywhere in the fabric.
-func inferMapping(f *fabric.Fabric, vni int, row roleService, rows []roleService) (Increment, bool) {
+func inferMapping(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex, vni int, row roleService, rows []roleService) (Increment, bool) {
 	seen := map[string]bool{}
 	var donors []roleService
 	for _, peer := range rows {
@@ -480,7 +474,7 @@ func inferMapping(f *fabric.Fabric, vni int, row roleService, rows []roleService
 		return Increment{}, false
 	}
 	m := change.VLANVNI{VLAN: matches[0], VNI: vni, VRF: expectedSVI.VRF, Address: expectedSVI.Addresses[0]}
-	if len(gatewayConflicts(f, vni, m.VRF, m.Address, row.device.Host, fmt.Sprintf("Vlan%d", m.VLAN))) > 0 {
+	if len(gatewayConflicts(f, indexes, vni, m.VRF, m.Address, row.device.Host, fmt.Sprintf("Vlan%d", m.VLAN))) > 0 {
 		return Increment{}, false
 	}
 	return newIncrement(row.device.Host, "vxlan.fabric_vlan_mapping_missing", m, c)

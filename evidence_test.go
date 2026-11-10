@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/configuration"
 	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
 )
@@ -45,12 +44,6 @@ func TestEvidenceAllowsSharedSliceViews(t *testing.T) {
 func TestDomainEncodingFailuresDoNotPanicOrBecomeNoConflict(t *testing.T) {
 	cycle := vxlan.Record{}
 	cycle["self"] = cycle
-	if _, err := configuration.NewSubnetIndex(cycle).Conflicts("192.0.2.0/24", "tenant", 10001, ""); !errors.Is(err, record.ErrEvidence) {
-		t.Fatal("invalid index became no conflict", err)
-	}
-	if values := configuration.ServiceRouteTargets([]vxlan.Record{{"direction": "both", "target": func() {}}}, 65000, 10001); values != nil {
-		t.Fatal("unencodable route target accepted")
-	}
 	if _, err := fabric.EncodeDocument(cycle); !errors.Is(err, fabric.ErrDocument) {
 		t.Fatal("invalid fabric document accepted", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/configuration"
 	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/rules"
 
@@ -50,13 +49,18 @@ func benchmarkFabric(devices, services int) (vxlan.Record, []vxlan.Record, vxlan
 	return configs, documents, policy
 }
 
-func BenchmarkServiceCatalog(b *testing.B) {
+func BenchmarkServices(b *testing.B) {
 	for _, services := range []int{64, 256, 1024} {
 		b.Run(fmt.Sprintf("vnis=%d", services), func(b *testing.B) {
 			configs, _, _ := benchmarkFabric(4, services)
+			body, _ := json.Marshal(configs["192.0.2.1"])
+			c, err := fabric.DecodeConfiguration(body)
+			if err != nil {
+				b.Fatal(err)
+			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if catalog := configuration.ServiceCatalog(configs); len(catalog) != services {
+				if n := len(c.Services()); n != services {
 					b.Fatal("service associations lost")
 				}
 			}

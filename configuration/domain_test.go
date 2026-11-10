@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/configuration"
 	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
 )
@@ -41,10 +40,12 @@ func TestDomainRubyCorpus(t *testing.T) {
 				// Typed parity tests in rules/ and change/ replay these cases;
 				// the legacy review and ChangePlan they described are retired.
 				return
-			case "catalog":
-				got = configuration.ServiceCatalog(record.Map(in["configs"]))
-			case "route_targets":
-				got = configuration.ServiceRouteTargets(in["entries"], in["asn"], in["vni"])
+			case "catalog", "route_targets", "subnets", "acl_rules", "acl_policy":
+				// Typed equivalents in fabric/ and rules/ replay these cases.
+				return
+			case "bgp_neighbors", "prefix_references":
+				// Retired: no rule consumes these relations.
+				return
 			case "scope":
 				callErr = fabric.ValidatePolicyDocument(in["policy"])
 				if callErr == nil {
@@ -58,22 +59,8 @@ func TestDomainRubyCorpus(t *testing.T) {
 					}
 					got = g
 				}
-			case "subnets":
-				got, callErr = configuration.NewSubnetIndex(record.Map(in["config"])).Conflicts(record.String(in["address"]), in["vrf"], in["vni"], record.String(in["except_interface"]))
-			case "bgp_neighbors":
-				tuples := []any{}
-				for _, n := range configuration.BGPNeighbors(record.Map(in["bgp"])) {
-					tuples = append(tuples, []any{n["vrf"], n["peer"], n["settings"]})
-				}
-				got = tuples
 			case "fingerprint":
 				got, callErr = vxlan.Fingerprint(in["value"])
-			case "acl_rules":
-				got = configuration.ACLRules(in["entries"])
-			case "acl_policy":
-				got = configuration.ResolveACLPolicy(record.Map(in["config"]), in["entries"])
-			case "prefix_references":
-				got, callErr = configuration.PrefixListReferences(record.Map(in["config"]), in["family"].(string))
 			default:
 				t.Fatalf("unknown case %s", row.Name)
 			}

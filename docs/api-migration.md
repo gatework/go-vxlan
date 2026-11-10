@@ -167,3 +167,5 @@ Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明
 | `review.QueryCatalog` | `workflow.Queries`（内部）；`rules.Commands` / `rules.Verifier` |
 
 输出：`plan.json` schema 3 去掉 `audits` 与 `fabric`（改见 `assessment.json`），`summary.json` 的 `counts` 改为 `increments` 与 `risk_counts`，`layout_version` 4；采集证据文档的 `recommendations` 改为 `assessment`。`apply` 同时接受 schema 2 与 3 的计划。
+
+`configuration` 中的 `ACLRules`、`ResolveACLPolicy`、`ACLBindings`、`AddressGroupReferences`、`ServiceCatalog`、`CatalogForHosts`、`EffectiveNVEMember`、`ServiceRouteTargets`、`ServiceTenant`、`ServiceMappingSignature`、`Network`、`Overlap`、`NewSubnetIndex`、`BGPNeighbors`、`PrefixListReferences` 已删除；替代为 `fabric.OrderedRules`、`Configuration.ResolveACL`、`Configuration.Services`、`EffectiveMember`、`ExpandRouteTargets`、`Tenant`、`fabric.NewSubnetIndex`（`BGPNeighbors`/`PrefixListReferences` 无规则使用，不再提供）。ACL 序号上限 4294967295 现在同样作用于类型化增量。

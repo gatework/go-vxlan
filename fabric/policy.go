@@ -52,10 +52,16 @@ func AddressGroupRefs(expression string) []string {
 
 // OrderedRules returns the ACL's rules by sequence without remarks, or nil
 // when sequences are invalid or duplicated, which leaves its order unknown.
+// MaxACLSequence is the highest NX-OS ACL sequence number.
+const MaxACLSequence = 4294967295
+
 func OrderedRules(entries []ACLEntry) []ACLRule {
+	if entries == nil {
+		return nil // not a rule list: order unknown, unlike an empty ACL
+	}
 	seen := map[int]bool{}
 	for _, e := range entries {
-		if e.Sequence < 1 || seen[e.Sequence] || !slices.Contains([]string{"permit", "deny", "remark"}, e.Action) {
+		if e.Sequence < 1 || e.Sequence > MaxACLSequence || seen[e.Sequence] || !slices.Contains([]string{"permit", "deny", "remark"}, e.Action) {
 			return nil
 		}
 		seen[e.Sequence] = true

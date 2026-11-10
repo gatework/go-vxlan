@@ -2,6 +2,7 @@ package change
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -9,6 +10,7 @@ import (
 	"slices"
 
 	vxlan "github.com/gatework/go-vxlan"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
 )
 
@@ -24,7 +26,8 @@ var configurationDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 type ExecutionPlan struct {
 	itemID, planSHA256, expectedSHA256 string
 	device, presentation               vxlan.Record
-	change                             *ChangePlan
+	change                             Change
+	commands, rollback                 []string
 }
 
 func NewExecutionPlan(body []byte, itemID string) (*ExecutionPlan, error) {
@@ -49,17 +52,26 @@ func NewExecutionPlan(body []byte, itemID string) (*ExecutionPlan, error) {
 	if err != nil || address.String() != host || !configurationDigest.MatchString(expected) {
 		return nil, ErrExecutionPlan
 	}
-	change, err := NewChangePlan(record.Map(item["change"]))
+	changeBody, err := json.Marshal(item["change"])
 	if err != nil {
 		return nil, ErrExecutionPlan
 	}
-	for key, rendered := range map[string][]string{"commands": change.Commands(), "rollback": change.Rollback()} {
+	change, err := DecodeChange(changeBody)
+	if err != nil {
+		return nil, ErrExecutionPlan
+	}
+	script, err := change.Render()
+	if err != nil {
+		return nil, ErrExecutionPlan
+	}
+	for key, rendered := range map[string][]string{"commands": script.Commands, "rollback": script.Rollback} {
 		values, ok := record.Strings(item[key])
 		if !ok || !slices.Equal(values, rendered) {
 			return nil, ErrExecutionPlan
 		}
 	}
-	return &ExecutionPlan{itemID: itemID, planSHA256: fmt.Sprintf("%x", sha256.Sum256(body)), expectedSHA256: expected, device: record.Copy(device).(vxlan.Record), presentation: record.Copy(item).(vxlan.Record), change: change}, nil
+	return &ExecutionPlan{itemID: itemID, planSHA256: fmt.Sprintf("%x", sha256.Sum256(body)), expectedSHA256: expected, device: record.Copy(device).(vxlan.Record), presentation: record.Copy(item).(vxlan.Record), change: change,
+		commands: script.Commands, rollback: script.Rollback}, nil
 }
 
 func (p *ExecutionPlan) Valid() bool                  { return p != nil && p.change != nil && p.planSHA256 != "" }
@@ -73,8 +85,8 @@ func (p *ExecutionPlan) Device() vxlan.Record {
 func (p *ExecutionPlan) Presentation() vxlan.Record {
 	return record.Copy(p.presentation).(vxlan.Record)
 }
-func (p *ExecutionPlan) Commands() []string { return p.change.Commands() }
-func (p *ExecutionPlan) Rollback() []string { return p.change.Rollback() }
+func (p *ExecutionPlan) Commands() []string { return slices.Clone(p.commands) }
+func (p *ExecutionPlan) Rollback() []string { return slices.Clone(p.rollback) }
 func (p *ExecutionPlan) ConfirmationToken() string {
 	return "APPLY " + p.Host() + " " + p.planSHA256[:12] + " " + p.itemID
 }
@@ -97,10 +109,24 @@ func (p *ExecutionPlan) CheckBefore(config vxlan.Record) error {
 	if err != nil {
 		return err
 	}
-	if digest != p.expectedSHA256 || !p.change.Eligible(checked) {
+	if digest != p.expectedSHA256 {
+		return ErrExecutionPlan
+	}
+	typed, err := typedConfiguration(checked)
+	if err != nil || p.change.Eligible(typed) != nil {
 		return ErrExecutionPlan
 	}
 	return nil
+}
+
+// typedConfiguration decodes a checked configuration record into the typed
+// model; unknown fields are rejected so they cannot pass unexamined.
+func typedConfiguration(config vxlan.Record) (*fabric.Configuration, error) {
+	body, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+	return fabric.DecodeConfiguration(body)
 }
 
 func (p *ExecutionPlan) CheckAfter(before, after vxlan.Record) (string, error) {
@@ -117,7 +143,12 @@ func (p *ExecutionPlan) CheckAfter(before, after vxlan.Record) (string, error) {
 	if err = vxlan.ValidateConfigurationRecord(checked); err != nil {
 		return "", ErrExecutionPlan
 	}
-	if !p.change.Satisfied(checked, before) {
+	typedBefore, err := typedConfiguration(before)
+	if err != nil {
+		return "", ErrExecutionPlan
+	}
+	typedAfter, err := typedConfiguration(checked)
+	if err != nil || p.change.Satisfied(typedAfter) != nil || p.change.Preserved(typedBefore, typedAfter) != nil {
 		return "", ErrExecutionPlan
 	}
 	return vxlan.Fingerprint(checked)

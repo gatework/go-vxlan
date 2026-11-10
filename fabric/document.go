@@ -52,3 +52,13 @@ func EncodeDocument(document any) (*Device, error) {
 	}
 	return DecodeDocument(body)
 }
+
+// DecodeConfiguration strictly decodes one configuration record. Unknown
+// fields are an error: unmodeled facts must not authorize a change.
+func DecodeConfiguration(body []byte) (*Configuration, error) {
+	var c Configuration
+	if err := strict(body, &c); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDocument, err)
+	}
+	return &c, nil
+}

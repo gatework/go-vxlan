@@ -223,7 +223,7 @@ func TestPolicyRejectsUnknownRule(t *testing.T) {
 	if err != nil || a == nil {
 		t.Fatal(err)
 	}
-	if len(rules.RuleIDs()) != len(rules.DeviceRules())+len(rules.FabricRules()) {
+	if len(rules.RuleIDs()) != len(rules.DeviceRules())+len(rules.FabricRules())+len(rules.BaselineRules())+len(rules.TemporalRules()) {
 		t.Fatal("rule ids")
 	}
 }

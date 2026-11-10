@@ -78,7 +78,7 @@ func (a *App) Run(ctx context.Context, args []string) (code int) {
 }
 
 func (a *App) usage() error {
-	_, e := fmt.Fprintln(a.Output, "用法：vxlan collect [选项]  只读采集与报告\n      vxlan parse [选项]    离线文件或 stdin 解析\n      vxlan review --batch DIR  离线诊断与修复建议\n      vxlan apply --plan FILE --item ID  交互确认后下发\n      vxlan --version\n使用各子命令 --help 查看参数。")
+	_, e := fmt.Fprintln(a.Output, "用法：vxlan collect [选项]  只读采集与报告\n      vxlan parse [选项]    离线文件或 stdin 解析\n      vxlan review --batch DIR  离线诊断与修复建议\n      vxlan baseline --batch DIR --fabric-policy FILE  由当前多数值生成待审核的基线\n      vxlan apply --plan FILE --item ID  交互确认后下发\n      vxlan --version\n使用各子命令 --help 查看参数。")
 	return e
 }
 func (a *App) fail(e error) int {

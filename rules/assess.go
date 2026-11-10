@@ -45,13 +45,20 @@ type FabricAssessment struct {
 
 // Report is the schema 3 assessment of a review.
 type Report struct {
-	SchemaVersion int                     `json:"schema_version"`
-	Platform      string                  `json:"platform"`
-	Devices       []DeviceAssessment      `json:"devices"`
-	Fabrics       []FabricAssessment      `json:"fabrics"`
-	Unassigned    []string                `json:"unassigned,omitempty"`
-	Counts        map[assess.Severity]int `json:"counts"`
-	Highest       assess.Severity         `json:"highest,omitempty"`
+	SchemaVersion int                `json:"schema_version"`
+	Platform      string             `json:"platform"`
+	Devices       []DeviceAssessment `json:"devices"`
+	Fabrics       []FabricAssessment `json:"fabrics"`
+	Unassigned    []string           `json:"unassigned,omitempty"`
+	// Baseline holds drift from the declared intent, when a baseline is given.
+	Baseline []FabricAssessment `json:"baseline,omitempty"`
+	// Changes holds per-device changes since a previous batch, when given.
+	Changes []DeviceAssessment `json:"changes,omitempty"`
+	// Appeared and Disappeared list devices present in only one batch.
+	Appeared    []string                `json:"appeared,omitempty"`
+	Disappeared []string                `json:"disappeared,omitempty"`
+	Counts      map[assess.Severity]int `json:"counts"`
+	Highest     assess.Severity         `json:"highest,omitempty"`
 	// Incomplete is true when any enabled rule could not run for lack of
 	// evidence; the report then cannot vouch for what it did not check.
 	Incomplete bool `json:"incomplete"`
@@ -59,8 +66,18 @@ type Report struct {
 
 // Assessor holds the two engines built from one policy.
 type Assessor struct {
-	devices *assess.Engine[*fabric.Device]
-	fabrics *assess.Engine[*fabric.Fabric]
+	devices  *assess.Engine[*fabric.Device]
+	fabrics  *assess.Engine[*fabric.Fabric]
+	baseline *assess.Engine[*BaselineScope]
+	temporal *assess.Engine[*Change]
+}
+
+// Inputs are optional comparison points for an assessment.
+type Inputs struct {
+	// Baseline is the frozen intent; nil skips baseline drift.
+	Baseline *fabric.Baseline
+	// Previous is the model of an earlier batch; nil skips change detection.
+	Previous *fabric.Model
 }
 
 // NewAssessor validates the policy against both catalogs. A rule named in
@@ -74,10 +91,20 @@ func NewAssessor(policy assess.Policy, commands Commands) (*Assessor, error) {
 	if err != nil {
 		return nil, err
 	}
+	baselineCatalog, err := assess.NewCatalog(BaselineRules()...)
+	if err != nil {
+		return nil, err
+	}
+	temporalCatalog, err := assess.NewCatalog(TemporalRules()...)
+	if err != nil {
+		return nil, err
+	}
 	for id := range policy.Rules {
 		_, inDevice := deviceCatalog.Lookup(id)
 		_, inFabric := fabricCatalog.Lookup(id)
-		if !inDevice && !inFabric {
+		_, inBaseline := baselineCatalog.Lookup(id)
+		_, inTemporal := temporalCatalog.Lookup(id)
+		if !inDevice && !inFabric && !inBaseline && !inTemporal {
 			return nil, fmt.Errorf("%w: policy names unknown rule %s", assess.ErrInvalid, id)
 		}
 	}
@@ -90,7 +117,15 @@ func NewAssessor(policy assess.Policy, commands Commands) (*Assessor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Assessor{devices: de, fabrics: fe}, nil
+	be, err := assess.NewEngine(baselineCatalog, subset(policy, baselineCatalog), v)
+	if err != nil {
+		return nil, err
+	}
+	te, err := assess.NewEngine(temporalCatalog, subset(policy, temporalCatalog), v)
+	if err != nil {
+		return nil, err
+	}
+	return &Assessor{devices: de, fabrics: fe, baseline: be, temporal: te}, nil
 }
 
 func subset[M any](p assess.Policy, c *assess.Catalog[M]) assess.Policy {
@@ -105,6 +140,11 @@ func subset[M any](p assess.Policy, c *assess.Catalog[M]) assess.Policy {
 
 // Assess evaluates every device and every fabric of the model.
 func (a *Assessor) Assess(ctx context.Context, m *fabric.Model) (Report, error) {
+	return a.AssessWith(ctx, m, Inputs{})
+}
+
+// AssessWith also compares the model with a baseline and a previous batch.
+func (a *Assessor) AssessWith(ctx context.Context, m *fabric.Model, inputs Inputs) (Report, error) {
 	r := Report{SchemaVersion: assess.SchemaVersion, Platform: "cisco_nxos", Devices: []DeviceAssessment{}, Fabrics: []FabricAssessment{}, Counts: map[assess.Severity]int{}}
 	add := func(as assess.Assessment) {
 		for sev, n := range as.Counts {
@@ -126,12 +166,52 @@ func (a *Assessor) Assess(ctx context.Context, m *fabric.Model) (Report, error) 
 		if err != nil {
 			return Report{}, err
 		}
-		members := []string{}
-		for _, d := range f.Members {
-			members = append(members, d.Host)
-		}
-		r.Fabrics = append(r.Fabrics, FabricAssessment{Name: f.Name, Members: members, Missing: f.Missing, Assessment: as})
+		r.Fabrics = append(r.Fabrics, FabricAssessment{Name: f.Name, Members: hosts(f.Members), Missing: f.Missing, Assessment: as})
 		add(as)
+	}
+	if b := inputs.Baseline; b != nil {
+		if err := b.Validate(); err != nil {
+			return Report{}, err
+		}
+		for _, f := range m.Fabrics {
+			as, err := a.baseline.Run(ctx, &BaselineScope{Fabric: f, Expect: b.For(f.Name)}, f.Coverage())
+			if err != nil {
+				return Report{}, err
+			}
+			r.Baseline = append(r.Baseline, FabricAssessment{Name: f.Name, Members: hosts(f.Members), Missing: f.Missing, Assessment: as})
+			add(as)
+		}
+	}
+	if prev := inputs.Previous; prev != nil {
+		before := map[string]*fabric.Device{}
+		for _, d := range prev.Devices {
+			before[d.Host] = d
+		}
+		now := map[string]bool{}
+		for _, d := range m.Devices {
+			now[d.Host] = true
+			p, ok := before[d.Host]
+			if !ok {
+				r.Appeared = append(r.Appeared, d.Host)
+				continue
+			}
+			c := &Change{Previous: p, Current: d}
+			as, err := a.temporal.Run(ctx, c, c.Coverage())
+			if err != nil {
+				return Report{}, err
+			}
+			r.Changes = append(r.Changes, DeviceAssessment{Device: d.Identity, Role: d.Role, Coverage: c.Coverage(), Assessment: as})
+			add(as)
+		}
+		for _, d := range prev.Devices {
+			if !now[d.Host] {
+				r.Disappeared = append(r.Disappeared, d.Host)
+			}
+		}
+		slices.Sort(r.Appeared)
+		slices.Sort(r.Disappeared)
+		// A device that stopped reporting cannot be vouched for.
+		r.Incomplete = r.Incomplete || len(r.Disappeared) > 0
 	}
 	if len(m.Fabrics) > 0 {
 		for _, d := range m.Unassigned {
@@ -143,6 +223,14 @@ func (a *Assessor) Assess(ctx context.Context, m *fabric.Model) (Report, error) 
 	return r, nil
 }
 
+func hosts(devices []*fabric.Device) []string {
+	out := []string{}
+	for _, d := range devices {
+		out = append(out, d.Host)
+	}
+	return out
+}
+
 // RuleIDs lists every rule identifier, for policy authoring and docs.
 func RuleIDs() []assess.RuleID {
 	var ids []assess.RuleID
@@ -150,6 +238,12 @@ func RuleIDs() []assess.RuleID {
 		ids = append(ids, r.Meta().ID)
 	}
 	for _, r := range FabricRules() {
+		ids = append(ids, r.Meta().ID)
+	}
+	for _, r := range BaselineRules() {
+		ids = append(ids, r.Meta().ID)
+	}
+	for _, r := range TemporalRules() {
 		ids = append(ids, r.Meta().ID)
 	}
 	return slices.Sorted(slices.Values(ids))

@@ -173,3 +173,43 @@ func diff(a, b map[string]bool) []string {
 	slices.Sort(out)
 	return out
 }
+
+func TestRealFabricsBaselineAndSelfComparison(t *testing.T) {
+	a, err := rules.NewAssessor(assess.Policy{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byRule := map[assess.RuleID]int{}
+	for _, rf := range realFabrics(t) {
+		var devices []*fabric.Device
+		for _, doc := range rf.documents {
+			d, _ := fabric.EncodeDocument(doc)
+			devices = append(devices, d)
+		}
+		m, _ := fabric.Build(devices, &rf.policy)
+		derived := rules.DeriveBaseline(m)
+		body, err := derived.Encode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := fabric.DecodeBaseline(body)
+		if err != nil {
+			t.Fatalf("derived baseline does not round-trip: %v", err)
+		}
+		r, err := a.AssessWith(t.Context(), m, rules.Inputs{Baseline: &b, Previous: m})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, fa := range r.Baseline {
+			for _, f := range fa.Assessment.Findings {
+				byRule[f.Rule]++
+			}
+		}
+		for _, c := range r.Changes {
+			if n := len(c.Assessment.Findings); n != 0 {
+				t.Errorf("self comparison reported %d changes", n)
+			}
+		}
+	}
+	t.Logf("drift from derived (majority) baselines by rule: %v", byRule)
+}

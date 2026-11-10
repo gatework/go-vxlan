@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gatework/go-netops/assess"
+	"github.com/gatework/go-vxlan/fabric"
 	"math"
 	"net/netip"
 	"os"
@@ -61,6 +62,19 @@ func ReadRulesPolicy(ctx context.Context, path string) (assess.Policy, error) {
 		return assess.Policy{}, e
 	}
 	return assess.DecodePolicy(b)
+}
+
+// ReadBaseline reads a frozen fabric baseline.
+func ReadBaseline(ctx context.Context, path string) (*fabric.Baseline, error) {
+	b, _, e := ncconfig.ReadFile(ctx, path, false)
+	if e != nil {
+		return nil, e
+	}
+	baseline, e := fabric.DecodeBaseline(b)
+	if e != nil {
+		return nil, e
+	}
+	return &baseline, nil
 }
 func ReadYAML(ctx context.Context, path string) (vxlan.Record, error) {
 	b, _, e := ncconfig.ReadFile(ctx, path, false)

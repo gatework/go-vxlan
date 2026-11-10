@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gatework/go-netops/assess"
 	"github.com/gatework/go-vxlan/fabric"
@@ -25,7 +26,11 @@ type ReviewOptions struct {
 	Policy  vxlan.Record
 	// Rules tunes the schema 3 risk assessment; the zero value runs every
 	// rule with its defaults.
-	Rules               assess.Policy
+	Rules assess.Policy
+	// Baseline is the frozen intent to report drift from; nil skips it.
+	Baseline *fabric.Baseline
+	// Previous are the sources of an earlier batch to report changes from.
+	Previous            []report.Source
 	Queries             review.QueryCatalog
 	Scripts, Standalone bool
 }
@@ -175,14 +180,14 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	return summary, nil
 }
 
-// assessSources runs the schema 3 rule catalogs over the typed model built
-// from the same sources the legacy review reads.
-func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Record, options ReviewOptions) (rules.Report, error) {
+// BuildModel builds the typed fabric model from report sources and an
+// optional fabric membership policy record.
+func BuildModel(sources []report.Source, policy vxlan.Record) (*fabric.Model, error) {
 	devices := make([]*fabric.Device, 0, len(sources))
 	for _, src := range sources {
 		d, err := fabric.EncodeDocument(src.Document)
 		if err != nil {
-			return rules.Report{}, err
+			return nil, err
 		}
 		devices = append(devices, d)
 	}
@@ -190,17 +195,48 @@ func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Re
 	if policy != nil {
 		body, err := json.Marshal(policy)
 		if err != nil {
-			return rules.Report{}, err
+			return nil, err
 		}
 		p, err := fabric.DecodePolicy(body)
 		if err != nil {
-			return rules.Report{}, err
+			return nil, err
 		}
 		membership = &p
 	}
-	model, err := fabric.Build(devices, membership)
+	return fabric.Build(devices, membership)
+}
+
+// DeriveBaseline proposes a baseline from a batch's current majority values.
+func DeriveBaseline(ctx context.Context, sources []report.Source, policy vxlan.Record) (fabric.Baseline, error) {
+	if err := ctx.Err(); err != nil {
+		return fabric.Baseline{}, err
+	}
+	if policy == nil {
+		return fabric.Baseline{}, errors.New("需要 Fabric 策略以确定成员与角色")
+	}
+	model, err := BuildModel(sources, policy)
+	if err != nil {
+		return fabric.Baseline{}, err
+	}
+	return rules.DeriveBaseline(model), nil
+}
+
+// assessSources runs the schema 3 rule catalogs over the typed model built
+// from the same sources the legacy review reads.
+func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Record, options ReviewOptions) (rules.Report, error) {
+	model, err := BuildModel(sources, policy)
 	if err != nil {
 		return rules.Report{}, err
+	}
+	inputs := rules.Inputs{Baseline: options.Baseline}
+	if options.Baseline != nil && policy == nil {
+		return rules.Report{}, errors.New("基线比对需要 Fabric 策略")
+	}
+	if len(options.Previous) > 0 {
+		// Previous devices keep their roles from the same policy.
+		if inputs.Previous, err = BuildModel(options.Previous, policy); err != nil {
+			return rules.Report{}, err
+		}
 	}
 	var commands rules.Commands
 	if options.Queries != nil {
@@ -210,5 +246,5 @@ func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Re
 	if err != nil {
 		return rules.Report{}, err
 	}
-	return assessor.Assess(ctx, model)
+	return assessor.AssessWith(ctx, model, inputs)
 }

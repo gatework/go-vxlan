@@ -85,3 +85,15 @@ apply 的可变执行事实由私有 `executionState` 持有：状态、pending 
 - `--rules-policy FILE` 以 YAML 启用/禁用规则、覆盖严重级别和阈值；未知规则名或参数类型错误直接拒绝。
 
 迁移按"影子运行"推进：已移植的检查由 `rules/parity_test.go` 在全部 `fabric`、`catalog`、`recommendations` 金样上与旧审查逐项对照；旧审查（`review`、`plan.json`）仍是变更计划的来源，未移植的检查（ACL 内容/绑定/依赖、地址组、网关冲突、子网重叠、RT 与租户路由、缺失映射推导）继续由旧审查产出，逐项移植后再下线。
+
+## 基线与变化
+
+- `vxlan baseline --batch DIR --fabric-policy FILE [--output FILE]` 由各 Fabric 当前多数值生成基线草案（Anycast 网关 MAC、SVI MTU、NVE、业务 VNI→VLAN、管理平面服务器）。多数值不等于正确值：草案须人工审核、删减后冻结；输出文件 0600 且不覆盖已有文件。
+- `review --baseline FILE` 以 `vxlan.baseline_*` 规则报告偏离声明意图的配置（类别 `drift`）。与成员一致性不同，全体成员一致但偏离基线同样报告。未声明字段不检查；`defaults` 与 `fabrics.<名称>` 按字段覆盖。
+- `review --previous DIR` 以 `vxlan.change_*` 规则逐设备比较两批证据：配置摘要、业务 VNI/VLAN、Up 的 NVE peer、已建立的 BGP 会话、FULL 的 OSPF 邻居、vPC 状态。任一侧证据不完整的维度不推断变化；仅出现在一批中的设备列入 `appeared` / `disappeared`，消失设备使评估标记为不完整。
+
+## 运维配置扩展
+
+`vendors/nxos` 的只读提取在配置记录中增加 `operations`：NTP/日志/TACACS/SNMP 服务器（不含密钥与 community）、NVE infra VLAN、VLAN 名称、trunk 放行列表、SVI DHCP 中继、fabric 端口与 vPC 域选项。提取不改变行状态与既有字段，Ruby 金样比较时剔除该字段。
+
+`VXLAN_REAL_CORPUS=<目录>` 启用真实配置回归（`fabric/realcorpus_test.go`、`rules/realcorpus_test.go`）：全部配置须完整解析并无损建模，类型化规则须与旧审查逐项一致，派生基线须可往返，同批自比较须无变化。测试只输出聚合统计，设备数据不进入仓库。

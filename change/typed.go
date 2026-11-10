@@ -86,7 +86,8 @@ func overlap(a, b netip.Prefix) bool {
 // gatewayContext requires an anycast SVI in the change's VRF and no other
 // interface of that VRF overlapping the gateway network.
 func gatewayContext(c *fabric.Configuration, vlan int, vrf, address string) bool {
-	svi := c.Interfaces[sviName(vlan)]
+	self := sviName(vlan)
+	svi := c.Interfaces[self]
 	if !fabric.True(svi.Anycast) || svi.VRF != vrf {
 		return false
 	}
@@ -95,7 +96,7 @@ func gatewayContext(c *fabric.Configuration, vlan int, vrf, address string) bool
 		return false
 	}
 	for name, other := range c.Interfaces {
-		if name == sviName(vlan) || other.VRF != vrf {
+		if name == self || other.VRF != vrf {
 			continue
 		}
 		for _, a := range other.Addresses {

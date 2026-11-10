@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/gatework/go-expect v0.5.0
 	github.com/gatework/go-net-connector v0.6.0
+	github.com/gatework/go-netops v0.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	go.yaml.in/yaml/v3 v3.0.6

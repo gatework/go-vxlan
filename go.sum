@@ -8,6 +8,8 @@ github.com/gatework/go-expect v0.5.0 h1:T3qYg02kd8aXIi25BXn4Ku6Vz2Z0obGHnjiXc2Bx
 github.com/gatework/go-expect v0.5.0/go.mod h1:VksOEeAZc6iZjmIyYxE2+ZZMKQIaOgayu4f1URe5uIs=
 github.com/gatework/go-net-connector v0.6.0 h1:XqNUCQacJ1AscpVSk40DyonfdssxZvgskxs3NjO7KyA=
 github.com/gatework/go-net-connector v0.6.0/go.mod h1:qre+xlEw3ThC+3ymiq2VZ7bFy5/WsRlSxaBrN82wAs4=
+github.com/gatework/go-netops v0.1.1 h1:TdQqSrJg+z2RFOo7L/5t23o5giBZ1syKgE9yJ6Mdet8=
+github.com/gatework/go-netops v0.1.1/go.mod h1:JpEw01h81Ji9LXQFDFayosgz5cLmfoqRBmmN4rRKpAE=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=

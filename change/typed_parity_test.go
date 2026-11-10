@@ -56,10 +56,6 @@ func typedConfig(t *testing.T, cfg vxlan.Record) (*fabric.Configuration, bool) {
 	return d.Configuration, d.Has(fabric.DimConfiguration)
 }
 
-func legacyEligible(p *change.ChangePlan, cfg vxlan.Record) bool {
-	return p.Eligible(record.Copy(cfg).(vxlan.Record))
-}
-
 func typedEligible(t *testing.T, c change.Change, cfg vxlan.Record) (bool, bool) {
 	tc, ok := typedConfig(t, cfg)
 	if !ok {
@@ -89,33 +85,51 @@ func changeBody(t *testing.T, v any) []byte {
 	return b
 }
 
+// TestTypedChangesMatchLegacyFixtures checks the typed increments against the
+// legacy expectations recorded in the build, eligible and satisfied fixtures.
 func TestTypedChangesMatchLegacyFixtures(t *testing.T) {
 	for file, c := range domainCases(t, "build", "eligible", "satisfied") {
 		var in map[string]any
 		_ = json.Unmarshal(c.Input, &in)
-		legacy, legacyErr := change.NewChangePlan(record.Map(in["change"]))
 		typed, typedErr := change.DecodeChange(changeBody(t, in["change"]))
-		if (legacyErr == nil) != (typedErr == nil) {
-			t.Errorf("%s %s: legacy err %v, typed err %v", c.Name, file, legacyErr, typedErr)
-			continue
-		}
-		if legacyErr != nil {
-			continue
-		}
-		script, err := typed.Render()
-		if err != nil || !slices.Equal(script.Commands, legacy.Commands()) || !slices.Equal(script.Rollback, legacy.Rollback()) {
-			t.Errorf("%s %s: render differs:\n typed  %q %q\n legacy %q %q", c.Name, file, script.Commands, script.Rollback, legacy.Commands(), legacy.Rollback())
-		}
 		switch c.Name {
-		case "eligible":
-			got, ok := typedEligible(t, typed, record.Map(in["config"]))
-			if want := legacyEligible(legacy, record.Map(in["config"])); ok && got != want {
-				t.Errorf("eligible %s: typed %v legacy %v", file, got, want)
+		case "build":
+			if (c.Error == nil) != (typedErr == nil) {
+				t.Errorf("build %s: legacy error %v, typed error %v", file, c.Error, typedErr)
+				continue
 			}
-		case "satisfied":
-			got, ok := typedSatisfied(t, typed, record.Map(in["after"]), record.Map(in["before"]))
-			if want := legacy.Satisfied(record.Map(in["after"]), record.Map(in["before"])); ok && got != want {
-				t.Errorf("satisfied %s: typed %v legacy %v", file, got, want)
+			if typedErr != nil {
+				continue
+			}
+			var want struct {
+				Commands []string `json:"commands"`
+				Rollback []string `json:"rollback"`
+			}
+			_ = json.Unmarshal(c.Expected, &want)
+			script, err := typed.Render()
+			if err != nil || !slices.Equal(script.Commands, want.Commands) || !slices.Equal(script.Rollback, want.Rollback) {
+				t.Errorf("build %s: render differs:\n typed  %q %q\n legacy %q %q", file, script.Commands, script.Rollback, want.Commands, want.Rollback)
+			}
+		case "eligible", "satisfied":
+			var want bool
+			if c.Error != nil || json.Unmarshal(c.Expected, &want) != nil {
+				if typedErr == nil && c.Error != nil {
+					t.Errorf("%s %s: legacy rejected the change, typed accepted it", c.Name, file)
+				}
+				continue
+			}
+			if typedErr != nil {
+				t.Errorf("%s %s: typed rejected a legacy change: %v", c.Name, file, typedErr)
+				continue
+			}
+			var got, ok bool
+			if c.Name == "eligible" {
+				got, ok = typedEligible(t, typed, record.Map(in["config"]))
+			} else {
+				got, ok = typedSatisfied(t, typed, record.Map(in["after"]), record.Map(in["before"]))
+			}
+			if ok && got != want {
+				t.Errorf("%s %s: typed %v legacy %v", c.Name, file, got, want)
 			}
 		}
 	}
@@ -239,18 +253,24 @@ func mutations(cfg vxlan.Record) map[string]vxlan.Record {
 	return out
 }
 
+// TestTypedChangesMatchLegacyOnMutations replays the frozen legacy verdicts
+// (testdata/typed/change-oracle.json) for every configuration mutation.
 func TestTypedChangesMatchLegacyOnMutations(t *testing.T) {
-	compared, skipped := 0, 0
+	body, err := os.ReadFile("../testdata/typed/change-oracle.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var oracle map[string]string
+	if err := json.Unmarshal(body, &oracle); err != nil {
+		t.Fatal(err)
+	}
+	compared := 0
 	for file, c := range domainCases(t, "eligible", "satisfied") {
 		var in map[string]any
 		_ = json.Unmarshal(c.Input, &in)
-		legacy, err := change.NewChangePlan(record.Map(in["change"]))
-		if err != nil {
-			continue
-		}
 		typed, err := change.DecodeChange(changeBody(t, in["change"]))
 		if err != nil {
-			t.Fatalf("%s: typed rejected a legacy change: %v", file, err)
+			continue
 		}
 		seeds := []vxlan.Record{record.Map(in["config"]), record.Map(in["before"]), record.Map(in["after"])}
 		for si, seed := range seeds {
@@ -258,36 +278,46 @@ func TestTypedChangesMatchLegacyOnMutations(t *testing.T) {
 				continue
 			}
 			for name, cfg := range mutations(seed) {
-				got, ok := typedEligible(t, typed, cfg)
+				eligible, ok := typedEligible(t, typed, cfg)
 				if !ok {
-					skipped++
-					continue
+					t.Fatalf("%s %s: mutation does not fit the typed model", file, name)
 				}
-				if want := legacyEligible(legacy, cfg); got != want {
-					t.Errorf("%s seed %d %s: eligible typed %v legacy %v", file, si, name, got, want)
-				}
-				// Readback of every mutation against every seed as "before".
-				for _, before := range seeds {
+				for bi, before := range seeds {
 					if before == nil {
 						continue
 					}
-					got, ok := typedSatisfied(t, typed, cfg, before)
-					if !ok {
-						skipped++
-						continue
+					want, frozen := oracle[oracleKey(file, si, name, bi)]
+					if !frozen {
+						t.Fatalf("%s seed %d %s: no frozen verdict", file, si, name)
 					}
-					if want := legacy.Satisfied(record.Copy(cfg).(vxlan.Record), record.Copy(before).(vxlan.Record)); got != want {
-						t.Errorf("%s seed %d %s: satisfied typed %v legacy %v", file, si, name, got, want)
+					satisfied, _ := typedSatisfied(t, typed, cfg, before)
+					if got := verdictCode(eligible, satisfied); got != want {
+						t.Errorf("%s seed %d %s before %d: typed %s legacy %s (eligible, satisfied)", file, si, name, bi, got, want)
 					}
 					compared++
 				}
 			}
 		}
 	}
-	if compared < 100 {
-		t.Fatalf("too few differential comparisons: %d", compared)
+	if compared != len(oracle) {
+		t.Fatalf("compared %d of %d frozen verdicts", compared, len(oracle))
 	}
-	t.Logf("differential comparisons: %d (skipped %d not fitting the typed model)", compared, skipped)
+	t.Logf("frozen legacy verdicts reproduced: %d", compared)
 }
 
-var _ = fmt.Sprint
+// oracleKey and verdictCode index the frozen legacy verdicts
+// (testdata/typed/change-oracle.json).
+func oracleKey(file string, seed int, mutation string, before int) string {
+	return fmt.Sprintf("%s/%d/%s/%d", file[:12], seed, mutation, before)
+}
+
+func verdictCode(eligible, satisfied bool) string {
+	code := []byte("00")
+	if eligible {
+		code[0] = '1'
+	}
+	if satisfied {
+		code[1] = '1'
+	}
+	return string(code)
+}

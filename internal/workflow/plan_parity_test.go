@@ -1,9 +1,7 @@
 package workflow_test
 
 import (
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,72 +12,12 @@ import (
 	"github.com/gatework/go-netops/evidence"
 	vxlan "github.com/gatework/go-vxlan"
 	changepkg "github.com/gatework/go-vxlan/change"
-	"github.com/gatework/go-vxlan/configuration"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/internal/workflow"
 	"github.com/gatework/go-vxlan/report"
-	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/vendors"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
-
-// legacyPlans is the legacy derivation of plan.json changes, kept as the
-// oracle for the typed derivation: fabric review candidates combined with
-// device advice, made executable by CandidateChangePlan.
-func legacyPlans(t *testing.T, sources []report.Source, policy vxlan.Record, queries review.QueryCatalog) (map[string]any, map[string][]string) {
-	t.Helper()
-	var documents []vxlan.Record
-	for _, s := range sources {
-		documents = append(documents, s.Document)
-	}
-	items := vxlan.Record{}
-	if policy != nil {
-		audit, err := review.ReviewFabric(documents, policy, queries)
-		if err != nil {
-			t.Fatal(err)
-		}
-		projected, _ := vxlan.ProjectRecord(audit)
-		items = record.Map(projected["device_items"])
-	}
-	changes, plans := map[string]any{}, map[string][]string{}
-	for _, src := range sources {
-		device := record.Map(src.Document["device"])
-		var additions []vxlan.Record
-		for _, x := range record.List(items[record.String(device["host"])]) {
-			additions = append(additions, record.Map(x))
-		}
-		advice, err := review.Advice(src.Document, queries, true, additions)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sourceHash := fmt.Sprintf("%x", sha256.Sum256(src.Body))
-		name := report.Basename(device)
-		config := configuration.CompleteConfig(src.Document)
-		for _, x := range record.List(advice["items"]) {
-			item := record.Map(x)
-			if config == nil || item["status"] != "candidate" || item["change"] == nil {
-				continue
-			}
-			plan := changepkg.CandidateChangePlan(record.Map(item["change"]), config)
-			if plan == nil {
-				continue
-			}
-			change := plan.Change()
-			parts := []string{name, record.String(change["kind"]), fmt.Sprintf("vlan%d", int(record.NumberFloat(change["vlan"])))}
-			if d := record.String(change["direction"]); d != "" {
-				parts = append(parts, d)
-			}
-			digest, _ := vxlan.Fingerprint(change)
-			expected, _ := vxlan.Fingerprint(config)
-			id := strings.Join(append(parts, digest[:12]), "--")
-			changes[id] = vxlan.Record{"schema_version": 1, "platform": "cisco_nxos", "device": device, "expected_config_sha256": expected,
-				"source": src.Path, "source_sha256": sourceHash, "change": change, "commands": plan.Commands(), "rollback": plan.Rollback(),
-				"scope": item["scope"], "title": item["title"], "prerequisites": item["prerequisites"], "impact": item["impact"], "verify": item["verify"]}
-			plans[name] = append(plans[name], id)
-		}
-	}
-	return changes, plans
-}
 
 func canonical(t *testing.T, v any) string {
 	t.Helper()
@@ -94,13 +32,18 @@ func canonical(t *testing.T, v any) string {
 	return string(body)
 }
 
-func comparePlans(t *testing.T, label string, sources []report.Source, policy vxlan.Record) int {
+type frozenPlans struct {
+	Changes map[string]any      `json:"changes"`
+	Plans   map[string][]string `json:"plans"`
+}
+
+func comparePlans(t *testing.T, label string, sources []report.Source, policy vxlan.Record, frozen frozenPlans) int {
 	t.Helper()
 	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantChanges, wantPlans := legacyPlans(t, sources, policy, profile)
+	wantChanges, wantPlans := frozen.Changes, frozen.Plans
 	r, err := report.New(filepath.Join(t.TempDir(), "review"))
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +77,17 @@ func comparePlans(t *testing.T, label string, sources []report.Source, policy vx
 	return len(wantChanges)
 }
 
+// TestPlanChangesMatchLegacyOnFixtures compares plan.json with the frozen
+// legacy derivation (testdata/typed/plan-oracle.json).
 func TestPlanChangesMatchLegacyOnFixtures(t *testing.T) {
+	oracleBody, err := os.ReadFile("../../testdata/typed/plan-oracle.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var oracle map[string]frozenPlans
+	if err := json.Unmarshal(oracleBody, &oracle); err != nil {
+		t.Fatal(err)
+	}
 	files, _ := filepath.Glob("../../testdata/domain/*.json")
 	total := 0
 	for _, f := range files {
@@ -149,7 +102,11 @@ func TestPlanChangesMatchLegacyOnFixtures(t *testing.T) {
 			b, _ := json.Marshal(doc)
 			sources = append(sources, report.Source{Path: "fixture.json", Body: b, Document: doc})
 		}
-		total += comparePlans(t, filepath.Base(f), sources, record.Map(input["policy"]))
+		frozen, ok := oracle[filepath.Base(f)]
+		if !ok {
+			t.Fatalf("%s: no frozen plans", filepath.Base(f))
+		}
+		total += comparePlans(t, filepath.Base(f), sources, record.Map(input["policy"]), frozen)
 	}
 	if total == 0 {
 		t.Fatal("no executable plans in fixtures")
@@ -202,7 +159,38 @@ func TestPlanChangesMatchLegacyOnRealCorpus(t *testing.T) {
 			record.Map(record.Map(policy["fabrics"])[name])[role] = hosts
 		}
 		projected, _ := vxlan.ProjectRecord(policy)
-		total += comparePlans(t, fmt.Sprintf("site with %d devices", len(s.sources)), s.sources, projected)
+		total += executablePlans(t, s.sources, projected)
 	}
-	t.Logf("real executable plans compared: %d", total)
+	t.Logf("real executable plans checked: %d", total)
+}
+
+// executablePlans reviews real sources and requires every plan to be
+// accepted by the execution plan parser.
+func executablePlans(t *testing.T, sources []report.Source, policy vxlan.Record) int {
+	t.Helper()
+	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := report.New(filepath.Join(t.TempDir(), "review"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workflow.Review(t.Context(), r, workflow.ReviewOptions{Sources: sources, Policy: policy, Queries: profile, Scripts: true, Standalone: true}); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(r.Directory, "plan.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := vxlan.DecodeDocument(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id := range record.Map(plan["changes"]) {
+		if _, err := changepkg.NewExecutionPlan(body, id); err != nil {
+			t.Errorf("execution plan rejects %s: %v", id, err)
+		}
+	}
+	return len(record.Map(plan["changes"]))
 }

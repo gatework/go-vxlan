@@ -144,6 +144,9 @@ var ported = map[string]bool{
 	"fabric_vlan_mapping_ambiguous": true, "fabric_vlan_mapping": true, "fabric_replication": true,
 	"fabric_arp_suppression": true, "fabric_vrf": true, "fabric_anycast": true, "fabric_mtu": true,
 	"fabric_shutdown": true, "fabric_anycast_mac": true, "fabric_role_conflict": true,
+	"fabric_gateway": true, "fabric_acl_binding": true, "fabric_acl_content": true, "fabric_acl_undefined": true,
+	"fabric_acl_dependency": true, "fabric_address_group": true, "fabric_subnet_vni_conflict": true,
+	"fabric_route_targets": true, "fabric_tenant_routing": true, "fabric_vlan_mapping_missing": true,
 }
 
 func subjectVNI(s assess.Subject) string {
@@ -208,6 +211,11 @@ func TestFabricRulesMatchLegacyReview(t *testing.T) {
 				Code string `json:"code"`
 				VNI  any    `json:"vni"`
 			} `json:"findings"`
+			// Legacy reports missing VLAN mappings as device recommendations.
+			DeviceItems map[string][]struct {
+				Code  string `json:"code"`
+				Scope string `json:"scope"`
+			} `json:"device_items"`
 		}
 		if err := json.Unmarshal(fx.Expected, &legacy); err != nil {
 			t.Fatal(err)
@@ -220,6 +228,14 @@ func TestFabricRulesMatchLegacyReview(t *testing.T) {
 					vni = fmt.Sprint(f.VNI)
 				}
 				want[f.Code+"@"+vni] = true
+			}
+		}
+		for _, items := range legacy.DeviceItems {
+			for _, item := range items {
+				if item.Code == "fabric_vlan_mapping_missing" {
+					_, after, _ := strings.Cut(item.Scope, "VNI ")
+					want[item.Code+"@"+after] = true
+				}
 			}
 		}
 		if !maps.Equal(got, want) {

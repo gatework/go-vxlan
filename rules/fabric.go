@@ -19,11 +19,11 @@ type fabricInput = assess.Input[*fabric.Fabric]
 
 // FabricRules returns the cross-device rules in evaluation order.
 func FabricRules() []fabricRule {
-	return []fabricRule{
+	return append([]fabricRule{
 		fabricEvidence, serviceIncomplete, vlanMappingAmbiguous, vlanMapping,
 		replication, arpSuppression, sviAttributes, anycastMAC, spineL2,
 		nvePeerMissing, duplicateLocalMAC,
-	}
+	}, fabricPolicyRules()...)
 }
 
 func fabricSubject(f *fabric.Fabric) assess.Subject { return assess.NewSubject("fabric", f.Name) }

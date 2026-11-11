@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 
 	"fmt"
-	"github.com/gatework/go-netops/assess"
 	"maps"
 	"slices"
 	"testing"
+
+	"github.com/gatework/go-netops/assess"
 
 	"github.com/gatework/go-netops/evidence"
 	vxlan "github.com/gatework/go-vxlan"

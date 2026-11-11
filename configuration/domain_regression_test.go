@@ -97,7 +97,7 @@ func TestSubnetIndexQueryAllocationGrowth(t *testing.T) {
 	for _, count := range []int{128, 512} {
 		c := &fabric.Configuration{Interfaces: map[string]fabric.Interface{}, VLANVNIs: map[string]*int{}}
 		addresses := make([]string, count)
-		for i := 0; i < count; i++ {
+		for i := range count {
 			addresses[i] = fmt.Sprintf("10.%d.%d.254/24", i/256, i%256)
 			c.Interfaces[fmt.Sprintf("Vlan%d", i+1)] = fabric.Interface{VRF: "tenant", Addresses: []string{addresses[i]}}
 			c.VLANVNIs[strconv.Itoa(i+1)] = new(10001 + i)
@@ -150,7 +150,7 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 		docs := []vxlan.Record{}
 		for hostIndex, host := range []string{"192.0.2.1", "192.0.2.2"} {
 			config := vxlan.Record{"review_status": "complete", "anycast_mac": "0011.0011.0011", "vlan_vnis": vxlan.Record{}, "interfaces": vxlan.Record{}, "nve": vxlan.Record{"members": vxlan.Record{}}, "evpn": vxlan.Record{}}
-			for i := 0; i < count; i++ {
+			for i := range count {
 				vlan, vni := strconv.Itoa(i+1), strconv.Itoa(i+10001)
 				addresses := []string{}
 				if hostIndex == 0 {

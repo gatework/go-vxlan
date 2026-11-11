@@ -35,9 +35,9 @@ type cfgState struct {
 	orders        map[string][]string
 }
 
-func cfgInt(s string, min, max int) int {
+func cfgInt(s string, minimum, maximum int) int {
 	n, e := strconv.Atoi(s)
-	if e != nil || n < min || n > max {
+	if e != nil || n < minimum || n > maximum {
 		panic("invalid_configuration_value")
 	}
 	return n
@@ -167,14 +167,7 @@ func cfgDocument(text string, document *ConfigurationDocument) ([]*cfgBlock, []v
 		}
 		if m := textparse.Match(`(?:banner\s+\S+|header\s+\S+(?:\s+information)?)\s+(.+)`, line); m != nil {
 			document.states[i] = LineIgnored
-			runes := []rune(m[1])
-			d := string(runes[:1])
-			if strings.HasPrefix(m[1], "^") && len(runes) >= 2 {
-				d = string(runes[:2])
-			}
-			if !strings.Contains(strings.TrimPrefix(m[1], d), d) {
-				banner = d
-			}
+			banner = cfgBannerDelimiter(m[1])
 			continue
 		}
 		if regexp.MustCompile(`(?i)--[ \t]*More[ \t]*--|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]`).MatchString(raw) {
@@ -257,16 +250,7 @@ func parseConfig(text string, complete bool, document *ConfigurationDocument) vx
 }
 func (s *cfgState) block(b *cfgBlock, d vxlan.Record) {
 	s.enter(b)
-	defer func() {
-		if r := recover(); r != nil {
-			if r != "invalid_configuration_value" {
-				panic(r)
-			}
-			s.issues = append(s.issues, vxlan.Record{"code": "invalid_configuration_value", "line": b.line})
-			s.invalidSource = s.current
-			s.mark(s.current, LineInvalid)
-		}
-	}()
+	defer s.recoverBlock(b)
 	t := b.text
 	if m := textparse.Match(`hostname (\S+)`, t); m != nil {
 		s.global(d, "hostname", nil, b, "duplicate_hostname", func() any { return m[1] })
@@ -284,90 +268,13 @@ func (s *cfgState) block(b *cfgBlock, d vxlan.Record) {
 		s.store(record.Map(d["breakouts"]), fmt.Sprintf("%d/%d", a, c), b, "duplicate_identity", []any{"breakouts", fmt.Sprintf("%d/%d", a, c)}, func() any { return vxlan.Record{"module_id": a, "port": c, "map": m[3]} })
 		s.leaf(b)
 	} else if m = textparse.Match(`interface (\S+)`, t); m != nil {
-		name := m[1]
-		if strings.HasPrefix(strings.ToLower(name), "vlan") {
-			name = "Vlan" + name[4:]
-		}
-		if textparse.Match(`(?i)nve\d+`, name) != nil {
-			s.global(d, "nve", vxlan.Record{"members": vxlan.Record{}}, b, "multiple_nve_interfaces", func() any { v := s.nve(b); v["interface"] = name; return v })
-		} else {
-			dest := record.Map(d["interfaces"])
-			s.store(dest, name, b, "duplicate_identity", []any{"interfaces", name}, func() any { return s.iface(b) })
-			v := record.Map(dest[name])
-			if s.assigned[fmt.Sprintf("%p:vrf", v)] && v["vrf"] == nil {
-				delete(dest, name)
-				s.conflicts++
-				s.issue(b, "conflicting_configuration_value")
-			}
-		}
+		s.blockInterface(b, d, m[1])
 	} else if m = textparse.Match(`vlan ([\d,-]+)`, t); m != nil {
-		ids := []int{}
-		for _, part := range strings.Split(m[1], ",") {
-			a := strings.Split(part, "-")
-			first := cfgInt(a[0], 1, 4094)
-			last := first
-			if len(a) == 2 {
-				last = cfgInt(a[1], first, 4094)
-			} else if len(a) != 1 {
-				panic("invalid_configuration_value")
-			}
-			for n := first; n <= last; n++ {
-				found := false
-				for _, x := range ids {
-					if x == n {
-						found = true
-					}
-				}
-				if !found {
-					ids = append(ids, n)
-				}
-			}
-		}
-		if len(b.children) == 0 {
-			return
-		}
-		maps := []*cfgBlock{}
-		for _, c := range b.children {
-			if strings.HasPrefix(c.text, "vn-segment") {
-				maps = append(maps, c)
-			}
-		}
-		for _, id := range ids {
-			s.store(record.Map(d["vlan_vnis"]), strconv.Itoa(id), b, "duplicate_identity", []any{"vlan_vnis", strconv.Itoa(id)}, func() any {
-				if len(maps) > 1 {
-					panic("invalid_configuration_value")
-				}
-				if len(maps) == 0 {
-					return nil
-				}
-				s.enter(maps[0])
-				v := cfgInt(strings.TrimPrefix(maps[0].text, "vn-segment "), 1, 16777215)
-				s.leaf(maps[0])
-				if len(ids) != 1 {
-					s.current = b
-					panic("invalid_configuration_value")
-				}
-				return v
-			})
-		}
-		for _, c := range b.children {
-			if !strings.HasPrefix(c.text, "vn-segment") {
-				s.ignore(c)
-			}
-		}
+		s.blockVLAN(b, d, m[1])
 	} else if m = textparse.Match(`vrf context (\S+)`, t); m != nil {
 		s.store(record.Map(d["vrfs"]), m[1], b, "duplicate_identity", []any{"vrfs", m[1]}, func() any { return s.vrf(b, true) })
 	} else if t == "evpn" {
-		for _, c := range b.children {
-			s.enter(c)
-			m := textparse.Match(`(?i)vni (\d+) (l[23])`, c.text)
-			if m == nil {
-				s.issue(c, "unsupported_configuration")
-				continue
-			}
-			id := cfgInt(m[1], 1, 16777215)
-			s.store(record.Map(d["evpn"]), strconv.Itoa(id), c, "duplicate_identity", []any{"evpn", strconv.Itoa(id)}, func() any { v := s.vrf(c, false); v["type"] = strings.ToLower(m[2]); return v })
-		}
+		s.blockEVPN(b, d)
 	} else if m = textparse.Match(`vpc domain (\d+)`, t); m != nil {
 		s.global(d, "vpc_domain", nil, b, "duplicate_vpc_domain", func() any { id := cfgInt(m[1], 1, 1000); v := s.vpc(b); v["id"] = id; return v })
 	} else if m = textparse.Match(`router bgp (\d+)`, t); m != nil {
@@ -391,34 +298,14 @@ func (s *cfgState) block(b *cfgBlock, d vxlan.Record) {
 	} else if m = textparse.Match(`object-group ip address (\S+)`, t); m != nil {
 		s.store(record.Map(d["address_groups"]), m[1], b, "duplicate_identity", []any{"address_groups", m[1]}, func() any { return s.addressGroup(b) })
 	} else if m = textparse.Match(`ip access-list (\S+)`, t); m != nil {
-		rows := []vxlan.Record{}
-		seq := map[int]bool{}
-		for _, c := range b.children {
-			s.enter(c)
-			if textparse.Match(`(?:(?:\d+ )?remark\b.*|statistics per-entry)`, c.text) != nil {
-				s.ignore(c)
-				continue
-			}
-			x := textparse.Match(`(\d+) (permit|deny) (.+)`, c.text)
-			if x == nil {
-				s.issue(c, "unsupported_configuration")
-				continue
-			}
-			n := cfgInt(x[1], 1, 4294967295)
-			seq[n] = true
-			rows = append(rows, vxlan.Record{"sequence": n, "action": x[2], "expression": x[3]})
-			s.leaf(c)
-		}
-		s.store(record.Map(d["acls"]), m[1], b, "duplicate_identity", []any{"acls", m[1]}, func() any {
-			s.current = b
-			if len(seq) != len(rows) {
-				panic("invalid_configuration_value")
-			}
-			return rows
-		})
+		s.blockACL(b, d, m[1])
 	} else if strings.HasPrefix(t, "ip route ") {
 		value := s.scope(b, []any{"static_routes", len(record.Rows(d["static_routes"]))}, func() any { return s.staticRoute(b) })
-		d["static_routes"] = append(record.Rows(d["static_routes"]), value.(vxlan.Record))
+		route, ok := value.(vxlan.Record)
+		if !ok {
+			panic("nxos: route scope returned an invalid type")
+		}
+		d["static_routes"] = append(record.Rows(d["static_routes"]), route)
 		s.leaf(b)
 	} else if t == "nv overlay evpn" || t == "no nv overlay evpn" {
 		s.assign(d, "nv_overlay_evpn", t == "nv overlay evpn", b)
@@ -427,14 +314,7 @@ func (s *cfgState) block(b *cfgBlock, d vxlan.Record) {
 		}
 		s.leaf(b)
 	} else if m = textparse.Match(`fabric forwarding anycast-gateway-mac (\S+)`, t); m != nil {
-		if textparse.Match(`(?i)(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}|(?:[0-9a-f]{4}-){2}[0-9a-f]{4}|(?:[0-9a-f]{2}:){5}[0-9a-f]{2}|(?:[0-9a-f]{2}-){5}[0-9a-f]{2}|[0-9a-f]{12}`, m[1]) == nil {
-			panic("invalid_configuration_value")
-		}
-		s.assign(d, "anycast_mac", m[1], b)
-		if value, ok := d["anycast_mac"]; ok {
-			s.capture(b, value, []any{"anycast_mac"})
-		}
-		s.leaf(b)
+		s.blockAnycastMAC(b, d, m[1])
 	} else if regexp.MustCompile(`^(?:interface|vlan|vrf|router|vpc|evpn|feature|ip prefix-list|ipv6 prefix-list|route-map)\b`).MatchString(t) {
 		s.issue(b, "unsupported_configuration")
 	} else if regexp.MustCompile(`(?i)^(?:%|ERROR:|Invalid command|--More--)`).MatchString(t) {
@@ -465,4 +345,159 @@ func (s *cfgState) keys(m vxlan.Record) []string {
 		}
 	}
 	return out
+}
+
+func (s *cfgState) blockInterface(b *cfgBlock, d vxlan.Record, name string) {
+	if strings.HasPrefix(strings.ToLower(name), "vlan") {
+		name = "Vlan" + name[4:]
+	}
+	if textparse.Match(`(?i)nve\d+`, name) != nil {
+		s.global(d, "nve", vxlan.Record{"members": vxlan.Record{}}, b, "multiple_nve_interfaces", func() any { v := s.nve(b); v["interface"] = name; return v })
+	} else {
+		dest := record.Map(d["interfaces"])
+		s.store(dest, name, b, "duplicate_identity", []any{"interfaces", name}, func() any { return s.iface(b) })
+		v := record.Map(dest[name])
+		if s.assigned[fmt.Sprintf("%p:vrf", v)] && v["vrf"] == nil {
+			delete(dest, name)
+			s.conflicts++
+			s.issue(b, "conflicting_configuration_value")
+		}
+	}
+}
+
+func (s *cfgState) blockVLAN(b *cfgBlock, d vxlan.Record, name string) {
+	ids := cfgVLANIDs(name)
+	if len(b.children) == 0 {
+		return
+	}
+	maps := []*cfgBlock{}
+	for _, c := range b.children {
+		if strings.HasPrefix(c.text, "vn-segment") {
+			maps = append(maps, c)
+		}
+	}
+	for _, id := range ids {
+		s.store(record.Map(d["vlan_vnis"]), strconv.Itoa(id), b, "duplicate_identity", []any{"vlan_vnis", strconv.Itoa(id)}, func() any {
+			if len(maps) > 1 {
+				panic("invalid_configuration_value")
+			}
+			if len(maps) == 0 {
+				return nil
+			}
+			s.enter(maps[0])
+			v := cfgInt(strings.TrimPrefix(maps[0].text, "vn-segment "), 1, 16777215)
+			s.leaf(maps[0])
+			if len(ids) != 1 {
+				s.current = b
+				panic("invalid_configuration_value")
+			}
+			return v
+		})
+	}
+	for _, c := range b.children {
+		if !strings.HasPrefix(c.text, "vn-segment") {
+			s.ignore(c)
+		}
+	}
+}
+
+func (s *cfgState) blockACL(b *cfgBlock, d vxlan.Record, name string) {
+	rows := []vxlan.Record{}
+	seq := map[int]bool{}
+	for _, c := range b.children {
+		s.enter(c)
+		if textparse.Match(`(?:(?:\d+ )?remark\b.*|statistics per-entry)`, c.text) != nil {
+			s.ignore(c)
+			continue
+		}
+		x := textparse.Match(`(\d+) (permit|deny) (.+)`, c.text)
+		if x == nil {
+			s.issue(c, "unsupported_configuration")
+			continue
+		}
+		n := cfgInt(x[1], 1, 4294967295)
+		seq[n] = true
+		rows = append(rows, vxlan.Record{"sequence": n, "action": x[2], "expression": x[3]})
+		s.leaf(c)
+	}
+	s.store(record.Map(d["acls"]), name, b, "duplicate_identity", []any{"acls", name}, func() any {
+		s.current = b
+		if len(seq) != len(rows) {
+			panic("invalid_configuration_value")
+		}
+		return rows
+	})
+}
+
+func (s *cfgState) blockEVPN(b *cfgBlock, d vxlan.Record) {
+	for _, c := range b.children {
+		s.enter(c)
+		m := textparse.Match(`(?i)vni (\d+) (l[23])`, c.text)
+		if m == nil {
+			s.issue(c, "unsupported_configuration")
+			continue
+		}
+		id := cfgInt(m[1], 1, 16777215)
+		s.store(record.Map(d["evpn"]), strconv.Itoa(id), c, "duplicate_identity", []any{"evpn", strconv.Itoa(id)}, func() any { v := s.vrf(c, false); v["type"] = strings.ToLower(m[2]); return v })
+	}
+}
+
+func cfgVLANIDs(value string) []int {
+	ids := []int{}
+	for part := range strings.SplitSeq(value, ",") {
+		a := strings.Split(part, "-")
+		first := cfgInt(a[0], 1, 4094)
+		last := first
+		if len(a) == 2 {
+			last = cfgInt(a[1], first, 4094)
+		} else if len(a) != 1 {
+			panic("invalid_configuration_value")
+		}
+		for n := first; n <= last; n++ {
+			found := false
+			for _, x := range ids {
+				if x == n {
+					found = true
+				}
+			}
+			if !found {
+				ids = append(ids, n)
+			}
+		}
+	}
+	return ids
+}
+
+func cfgBannerDelimiter(value string) string {
+	runes := []rune(value)
+	d := string(runes[:1])
+	if strings.HasPrefix(value, "^") && len(runes) >= 2 {
+		d = string(runes[:2])
+	}
+	if !strings.Contains(strings.TrimPrefix(value, d), d) {
+		return d
+	}
+	return ""
+}
+
+func (s *cfgState) recoverBlock(b *cfgBlock) {
+	if r := recover(); r != nil {
+		if r != "invalid_configuration_value" {
+			panic(r)
+		}
+		s.issues = append(s.issues, vxlan.Record{"code": "invalid_configuration_value", "line": b.line})
+		s.invalidSource = s.current
+		s.mark(s.current, LineInvalid)
+	}
+}
+
+func (s *cfgState) blockAnycastMAC(b *cfgBlock, d vxlan.Record, mac string) {
+	if textparse.Match(`(?i)(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}|(?:[0-9a-f]{4}-){2}[0-9a-f]{4}|(?:[0-9a-f]{2}:){5}[0-9a-f]{2}|(?:[0-9a-f]{2}-){5}[0-9a-f]{2}|[0-9a-f]{12}`, mac) == nil {
+		panic("invalid_configuration_value")
+	}
+	s.assign(d, "anycast_mac", mac, b)
+	if value, ok := d["anycast_mac"]; ok {
+		s.capture(b, value, []any{"anycast_mac"})
+	}
+	s.leaf(b)
 }

@@ -24,7 +24,7 @@ func TestConfigReviewRegressions(t *testing.T) {
 	if ParseConfig("\u00a0hostname LEAF\n", true).Complete() {
 		t.Fatal("unicode whitespace accepted")
 	}
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		o = ParseConfig("hostname LEAF\nvrf context Z\n  vni 10000\nvrf context A\n  vni 10000\n", true)
 		f := o.Records[0]["review_findings"].([]vxlan.Record)
 		if f[0]["vrf"] != "Z" || f[1]["vrf"] != "A" {

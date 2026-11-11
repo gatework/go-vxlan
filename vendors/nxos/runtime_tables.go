@@ -31,66 +31,9 @@ func (p *rtParser) interfaces(text string) {
 			return
 		}
 		r := vxlan.Record{"interface": words[0], "state": strings.ToLower(words[state]), "detail": strings.Join(words[state+1:], " ")}
-		switch {
-		case rtMatch(`(?i)^Port\s+VRF`, layout):
-			if state != 2 || (len(words) != 4 && len(words) != 6) || (len(words) == 6 && !rtMatch(`^\d+$`, words[5])) || (words[3] != "--" && !rtValidIP(words[3])) {
-				p.unparsed(n)
-				return
-			}
-			r["vrf"] = words[1]
-			r["ip_address"] = words[3]
-			if len(words) == 6 {
-				r["speed"] = words[4]
-				r["mtu"] = rtNum(words[5])
-			}
-		case rtMatch(`(?i)^(?:Ethernet|Port-channel)\s+VLAN`, layout):
-			if state != 4 || len(words) < 8 {
-				p.unparsed(n)
-				return
-			}
-			r["vlan"] = words[1]
-			r["type"] = words[2]
-			r["mode"] = words[3]
-			r["reason"] = strings.Join(words[5:len(words)-2], " ")
-			r["speed"] = words[len(words)-2]
-			key := "protocol"
-			if strings.HasPrefix(layout, "Ethernet") {
-				key = "port_channel"
-			}
-			r[key] = words[len(words)-1]
-		case rtMatch(`(?i)^Interface\s+Status`, layout):
-			if state != 1 {
-				p.unparsed(n)
-				return
-			}
-			r["description"] = strings.Join(words[2:], " ")
-		case rtMatch(`(?i)^Interface\s+Secondary`, layout):
-			if state < 2 {
-				p.unparsed(n)
-				return
-			}
-			r["secondary_vlan"] = strings.Join(words[1:state], " ")
-			r["reason"] = strings.Join(words[state+1:], " ")
-		case rtMatch(`(?i)^Port\s+Status Reason`, layout):
-			if state != 1 || len(words) < 4 || !rtMatch(`^\d+$`, words[len(words)-1]) {
-				p.unparsed(n)
-				return
-			}
-			r["reason"] = strings.Join(words[2:len(words)-1], " ")
-			r["mtu"] = rtNum(words[len(words)-1])
-		default:
-			m := rtFind(`(?i)^\S+\s+(.*?)\s+(connected|notconnect|disabled|admin-down|up|down)\s+(\d+|routed|trunk|unassigned|--)\s+(full|half|a-full|a-half|auto|--)\s+(\S+)\s+(.+)$`, line)
-			if m == nil {
-				p.unparsed(n)
-				return
-			}
-			r["name"] = m[1]
-			r["state"] = strings.ToLower(m[2])
-			r["vlan"] = m[3]
-			r["duplex"] = m[4]
-			r["speed"] = m[5]
-			r["type"] = m[6]
-			r["detail"] = strings.Join(m[3:], " ")
+		if !rtInterfaceFields(r, layout, line, words, state) {
+			p.unparsed(n)
+			return
 		}
 		p.rows = append(p.rows, r)
 	})
@@ -126,7 +69,7 @@ func (p *rtParser) ports(text string) {
 			previous = vxlan.Record{"group": rtNum(m[1]), "interface": m[2], "flags": m[3], "type": m[4], "protocol": m[5], "members": p.members(m[6])}
 			p.rows = append(p.rows, previous)
 		} else if rtMatch(`(?i)^(?:Eth(?:ernet)?\S+\([^)]+\)\s*)+$`, line) && previous != nil {
-			previous["members"] = append(previous["members"].([]vxlan.Record), p.members(line)...)
+			previous["members"] = append(parsedValue[[]vxlan.Record](previous["members"]), p.members(line)...)
 		} else if m := rtFind(`(?i)^Number of port-channels\s*:\s*(\d+)$`, line); m != nil {
 			totals = append(totals, rtNum(m[1]))
 			previous = nil
@@ -140,10 +83,10 @@ func (p *rtParser) ports(text string) {
 	})
 	all := []vxlan.Record{}
 	for _, r := range p.rows {
-		all = append(all, r["members"].([]vxlan.Record)...)
+		all = append(all, parsedValue[[]vxlan.Record](r["members"])...)
 	}
 	keyFn := func(r vxlan.Record) string {
-		return rtRE(`(?i)^Eth(?:ernet)?`).ReplaceAllString(r["interface"].(string), "Eth")
+		return rtRE(`(?i)^Eth(?:ernet)?`).ReplaceAllString(parsedValue[string](r["interface"]), "Eth")
 	}
 	valid := p.dedup(all, nil, keyFn)
 	keys := map[string]bool{}
@@ -152,7 +95,7 @@ func (p *rtParser) ports(text string) {
 	}
 	for _, r := range p.rows {
 		members := []vxlan.Record{}
-		for _, m := range r["members"].([]vxlan.Record) {
+		for _, m := range parsedValue[[]vxlan.Record](r["members"]) {
 			if keys[keyFn(m)] {
 				members = append(members, m)
 			}
@@ -198,7 +141,7 @@ func (p *rtParser) macs(text string) {
 	p.rows = p.dedup(p.rows, nil, func(r vxlan.Record) string {
 		base := rtKey(r, []string{"vlan_id", "mac"})
 		if r["flags"] == "G" && r["type"] == "static" {
-			dest := r["destination"].(string)
+			dest := parsedValue[string](r["destination"])
 			gateway := rtMatch(`(?i)^sup-eth\d+\(R\)$`, dest)
 			if m := rtFind(`(?i)^(Lo\d+)\(R\)(?: \((Lo\d+)\))?$`, dest); m != nil {
 				gateway = m[2] == "" || strings.EqualFold(m[1], m[2])
@@ -209,4 +152,63 @@ func (p *rtParser) macs(text string) {
 		}
 		return base
 	})
+}
+
+func rtInterfaceFields(r vxlan.Record, layout, line string, words []string, state int) bool {
+	switch {
+	case rtMatch(`(?i)^Port\s+VRF`, layout):
+		if state != 2 || (len(words) != 4 && len(words) != 6) || (len(words) == 6 && !rtMatch(`^\d+$`, words[5])) || (words[3] != "--" && !rtValidIP(words[3])) {
+			return false
+		}
+		r["vrf"] = words[1]
+		r["ip_address"] = words[3]
+		if len(words) == 6 {
+			r["speed"] = words[4]
+			r["mtu"] = rtNum(words[5])
+		}
+	case rtMatch(`(?i)^(?:Ethernet|Port-channel)\s+VLAN`, layout):
+		if state != 4 || len(words) < 8 {
+			return false
+		}
+		r["vlan"] = words[1]
+		r["type"] = words[2]
+		r["mode"] = words[3]
+		r["reason"] = strings.Join(words[5:len(words)-2], " ")
+		r["speed"] = words[len(words)-2]
+		key := "protocol"
+		if strings.HasPrefix(layout, "Ethernet") {
+			key = "port_channel"
+		}
+		r[key] = words[len(words)-1]
+	case rtMatch(`(?i)^Interface\s+Status`, layout):
+		if state != 1 {
+			return false
+		}
+		r["description"] = strings.Join(words[2:], " ")
+	case rtMatch(`(?i)^Interface\s+Secondary`, layout):
+		if state < 2 {
+			return false
+		}
+		r["secondary_vlan"] = strings.Join(words[1:state], " ")
+		r["reason"] = strings.Join(words[state+1:], " ")
+	case rtMatch(`(?i)^Port\s+Status Reason`, layout):
+		if state != 1 || len(words) < 4 || !rtMatch(`^\d+$`, words[len(words)-1]) {
+			return false
+		}
+		r["reason"] = strings.Join(words[2:len(words)-1], " ")
+		r["mtu"] = rtNum(words[len(words)-1])
+	default:
+		m := rtFind(`(?i)^\S+\s+(.*?)\s+(connected|notconnect|disabled|admin-down|up|down)\s+(\d+|routed|trunk|unassigned|--)\s+(full|half|a-full|a-half|auto|--)\s+(\S+)\s+(.+)$`, line)
+		if m == nil {
+			return false
+		}
+		r["name"] = m[1]
+		r["state"] = strings.ToLower(m[2])
+		r["vlan"] = m[3]
+		r["duplex"] = m[4]
+		r["speed"] = m[5]
+		r["type"] = m[6]
+		r["detail"] = strings.Join(m[3:], " ")
+	}
+	return true
 }

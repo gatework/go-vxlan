@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type commandExit int
+type exitError int
 
-func (e commandExit) Error() string { return "command incomplete" }
+func (e exitError) Error() string { return "command incomplete" }
 func (a *App) runCommands(ctx context.Context, args []string) int {
 	if len(args) > 1 {
 		switch args[0] {
@@ -49,7 +49,7 @@ func (a *App) runCommands(ctx context.Context, args []string) int {
 		c.Flags().AddFlagSet(a.commandFlags(name))
 		c.RunE = func(c *cobra.Command, _ []string) error {
 			if code := run(c.Context(), c.Flags()); code != 0 {
-				return commandExit(code)
+				return exitError(code)
 			}
 			return nil
 		}
@@ -63,8 +63,7 @@ func (a *App) runCommands(ctx context.Context, args []string) int {
 	add("baseline", a.baseline)
 	err := root.ExecuteContext(ctx)
 	if err != nil {
-		var code commandExit
-		if errors.As(err, &code) {
+		if code, ok := errors.AsType[exitError](err); ok {
 			return int(code)
 		}
 		return a.fail(err)

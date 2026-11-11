@@ -6,6 +6,7 @@ import (
 	"slices"
 )
 
+// Copy recursively detaches supported containers while preserving their concrete types.
 func Copy(v any) any {
 	if v == nil {
 		return nil
@@ -43,10 +44,11 @@ func Copy(v any) any {
 	}
 }
 
+// CopyRecords returns detached copies of the supplied records.
 func CopyRecords(in []Record) []Record {
 	out := make([]Record, len(in))
 	for i, r := range in {
-		out[i] = Copy(r).(Record)
+		out[i] = Clone(r)
 	}
 	return out
 }
@@ -78,7 +80,7 @@ func copyReflect(v reflect.Value) reflect.Value {
 			return reflect.Zero(v.Type())
 		}
 		r := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			r.Index(i).Set(copyReflect(v.Index(i)))
 		}
 		return r
@@ -91,11 +93,20 @@ func copyReflect(v reflect.Value) reflect.Value {
 		return r
 	case reflect.Array:
 		r := reflect.New(v.Type()).Elem()
-		for i := 0; i < v.Len(); i++ {
+		for i := range v.Len() {
 			r.Index(i).Set(copyReflect(v.Index(i)))
 		}
 		return r
 	default:
 		return v
 	}
+}
+
+// Clone preserves the concrete type while copying supported record values.
+func Clone[T any](value T) T {
+	out, ok := Copy(value).(T)
+	if !ok {
+		panic("record: copy changed its input type")
+	}
+	return out
 }

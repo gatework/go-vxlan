@@ -38,7 +38,7 @@ type temporalRule = assess.Rule[*Change]
 type temporalInput = assess.Input[*Change]
 
 // TemporalRules report what changed since the previous batch.
-func TemporalRules() []temporalRule {
+func TemporalRules() []assess.Rule[*Change] {
 	return []temporalRule{configChanged, servicesChanged, nvePeersLost, bgpSessionsLost, ospfLost, vpcPeerChanged}
 }
 

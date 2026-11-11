@@ -40,6 +40,7 @@ const IssueUnmodeled = "unmodeled_fact"
 // Role is a device's fabric role.
 type Role string
 
+// Fabric membership roles.
 const (
 	RoleLeaf       Role = "leaf"
 	RoleBorder     Role = "border"
@@ -73,9 +74,6 @@ type Device struct {
 	Coverage      evidence.Coverage                       `json:"coverage"`
 	Issues        map[evidence.Dimension][]evidence.Issue `json:"issues,omitempty"`
 }
-
-// Has reports whether a dimension is complete for this device.
-func (d *Device) Has(dim evidence.Dimension) bool { return d.Coverage.Status(dim).Complete() }
 
 // Observed is the parser output for one dimension, independent of the
 // legacy record representation: a status, records as JSON objects and
@@ -118,6 +116,9 @@ func NewDevice(id Identity, dims map[evidence.Dimension]Observed) *Device {
 	}
 	return d
 }
+
+// Has reports whether a dimension is complete for this device.
+func (d *Device) Has(dim evidence.Dimension) bool { return d.Coverage.Status(dim).Complete() }
 
 func (d *Device) decode(dim evidence.Dimension, records []json.RawMessage) error {
 	switch dim {
@@ -203,75 +204,84 @@ func DecodeIssue(raw json.RawMessage) (evidence.Issue, error) {
 		return evidence.Issue{}, err
 	}
 	var issue evidence.Issue
-	intOf := func(v any) (int, bool) {
-		n, ok := v.(json.Number)
-		if !ok {
-			return 0, false
-		}
-		i, err := strconv.Atoi(n.String())
-		return i, err == nil
-	}
+
 	for k, v := range fields {
-		switch k {
-		case "code":
-			s, ok := v.(string)
-			if !ok || s == "" {
-				return evidence.Issue{}, fmt.Errorf("issue code")
-			}
-			issue.Code = s
-		case "line", "first_line":
-			n, ok := intOf(v)
-			if !ok {
-				return evidence.Issue{}, fmt.Errorf("issue %s", k)
-			}
-			issue.Line = n
-		case "count":
-			n, ok := intOf(v)
-			if !ok {
-				return evidence.Issue{}, fmt.Errorf("issue count")
-			}
-			issue.Count = n
-		case "expected", "observed", "parsed":
-			n, ok := intOf(v)
-			if !ok {
-				// Device-declared totals can exceed int; keep the exact digits.
-				digits, isNumber := v.(json.Number)
-				if !isNumber {
-					return evidence.Issue{}, fmt.Errorf("issue %s", k)
-				}
-				issue.Detail = strings.TrimSpace(issue.Detail + " " + k + "=" + digits.String())
-				continue
-			}
-			if k == "expected" {
-				issue.Expected = &n
-			} else {
-				issue.Observed = &n
-			}
-		case "field":
-			s, _ := v.(string)
-			issue.Fields = append(issue.Fields, s)
-		case "fields":
-			list, ok := v.([]any)
-			if !ok {
-				return evidence.Issue{}, fmt.Errorf("issue fields")
-			}
-			for _, e := range list {
-				s, _ := e.(string)
-				issue.Fields = append(issue.Fields, s)
-			}
-		default:
-			s, ok := v.(string)
-			if !ok {
-				return evidence.Issue{}, fmt.Errorf("issue field %s", k)
-			}
-			if issue.Scope == nil {
-				issue.Scope = map[string]string{}
-			}
-			issue.Scope[k] = s
+		if err := decodeIssueField(&issue, k, v); err != nil {
+			return evidence.Issue{}, err
 		}
 	}
 	if issue.Code == "" {
 		return evidence.Issue{}, fmt.Errorf("issue code")
 	}
 	return issue, nil
+}
+
+func issueInteger(v any) (int, bool) {
+	n, ok := v.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	i, err := strconv.Atoi(n.String())
+	return i, err == nil
+}
+
+func decodeIssueField(issue *evidence.Issue, k string, v any) error {
+	switch k {
+	case "code":
+		s, ok := v.(string)
+		if !ok || s == "" {
+			return fmt.Errorf("issue code")
+		}
+		issue.Code = s
+	case "line", "first_line":
+		n, ok := issueInteger(v)
+		if !ok {
+			return fmt.Errorf("issue %s", k)
+		}
+		issue.Line = n
+	case "count":
+		n, ok := issueInteger(v)
+		if !ok {
+			return fmt.Errorf("issue count")
+		}
+		issue.Count = n
+	case "expected", "observed", "parsed":
+		n, ok := issueInteger(v)
+		if !ok {
+			// Device-declared totals can exceed int; keep the exact digits.
+			digits, isNumber := v.(json.Number)
+			if !isNumber {
+				return fmt.Errorf("issue %s", k)
+			}
+			issue.Detail = strings.TrimSpace(issue.Detail + " " + k + "=" + digits.String())
+			return nil
+		}
+		if k == "expected" {
+			issue.Expected = &n
+		} else {
+			issue.Observed = &n
+		}
+	case "field":
+		s, _ := v.(string)
+		issue.Fields = append(issue.Fields, s)
+	case "fields":
+		list, ok := v.([]any)
+		if !ok {
+			return fmt.Errorf("issue fields")
+		}
+		for _, e := range list {
+			s, _ := e.(string)
+			issue.Fields = append(issue.Fields, s)
+		}
+	default:
+		s, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("issue field %s", k)
+		}
+		if issue.Scope == nil {
+			issue.Scope = map[string]string{}
+		}
+		issue.Scope[k] = s
+	}
+	return nil
 }

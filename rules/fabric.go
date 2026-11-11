@@ -18,7 +18,7 @@ type fabricRule = assess.Rule[*fabric.Fabric]
 type fabricInput = assess.Input[*fabric.Fabric]
 
 // FabricRules returns the cross-device rules in evaluation order.
-func FabricRules() []fabricRule {
+func FabricRules() []assess.Rule[*fabric.Fabric] {
 	return append([]fabricRule{
 		fabricEvidence, serviceIncomplete, vlanMappingAmbiguous, vlanMapping,
 		replication, arpSuppression, sviAttributes, anycastMAC, spineL2,

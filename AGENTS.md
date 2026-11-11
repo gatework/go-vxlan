@@ -1,5 +1,7 @@
 # go-vxlan 开发说明
 
+遵循 [gatework Go 工程规范](https://github.com/gatework/go-standards/blob/v1.0.2/STANDARD.md)（go-standards/STANDARD.md）；提交前运行 `make check`。
+
 本项目提供 Cisco NX-OS VXLAN/EVPN 的配置与运行态解析、采集、Fabric 审查和受控增量变更，同时提供 Go 库与 `cmd/vxlan` CLI。用法见 [README.md](README.md)。
 
 ## 工作入口

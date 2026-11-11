@@ -167,8 +167,10 @@ type SVIGateway struct {
 	Address string `json:"address"`
 }
 
+// Kind identifies the configuration change kind.
 func (SVIGateway) Kind() netchange.Kind { return KindSVIGateway }
 
+// Validate checks that the proposed change has valid target values.
 func (g SVIGateway) Validate() error {
 	if err := validVLANVNI(g.VLAN, g.VNI); err != nil {
 		return err
@@ -176,6 +178,7 @@ func (g SVIGateway) Validate() error {
 	return validGateway(g.VRF, g.Address)
 }
 
+// Render returns the configuration and rollback commands after validation.
 func (g SVIGateway) Render() (netchange.Script, error) {
 	if err := g.Validate(); err != nil {
 		return netchange.Script{}, err
@@ -187,6 +190,7 @@ func (g SVIGateway) Render() (netchange.Script, error) {
 	}, nil
 }
 
+// Eligible checks whether the current configuration meets the change prerequisites.
 func (g SVIGateway) Eligible(c *fabric.Configuration) error {
 	svi, ok := mappedSVI(c, g.VLAN, g.VNI)
 	if !ok || !gatewayContext(c, g.VLAN, g.VRF, g.Address) || len(svi.Addresses) != 0 {
@@ -195,10 +199,7 @@ func (g SVIGateway) Eligible(c *fabric.Configuration) error {
 	return nil
 }
 
-func (g SVIGateway) target(c *fabric.Configuration) bool {
-	return gatewayContext(c, g.VLAN, g.VRF, g.Address) && slices.Equal(c.Interfaces[sviName(g.VLAN)].Addresses, []string{g.Address})
-}
-
+// Satisfied checks whether the target configuration contains the proposed state.
 func (g SVIGateway) Satisfied(c *fabric.Configuration) error {
 	if _, ok := mappedSVI(c, g.VLAN, g.VNI); !ok || !g.target(c) {
 		return errTarget
@@ -206,6 +207,7 @@ func (g SVIGateway) Satisfied(c *fabric.Configuration) error {
 	return nil
 }
 
+// Preserved checks that unrelated configuration remains unchanged.
 func (g SVIGateway) Preserved(before, after *fabric.Configuration) error {
 	return preserved(before, after, func(c *fabric.Configuration) {
 		if svi, ok := c.Interfaces[sviName(g.VLAN)]; ok {
@@ -224,8 +226,10 @@ type VLANVNI struct {
 	Address string `json:"address"`
 }
 
+// Kind identifies the configuration change kind.
 func (VLANVNI) Kind() netchange.Kind { return KindVLANVNI }
 
+// Validate checks that the proposed change has valid target values.
 func (v VLANVNI) Validate() error {
 	if err := validVLANVNI(v.VLAN, v.VNI); err != nil {
 		return err
@@ -233,6 +237,7 @@ func (v VLANVNI) Validate() error {
 	return validGateway(v.VRF, v.Address)
 }
 
+// Render returns the configuration and rollback commands after validation.
 func (v VLANVNI) Render() (netchange.Script, error) {
 	if err := v.Validate(); err != nil {
 		return netchange.Script{}, err
@@ -243,28 +248,7 @@ func (v VLANVNI) Render() (netchange.Script, error) {
 	}, nil
 }
 
-// target: gateway in place, NVE L2 member and L2 EVPN for the VNI, and no
-// other VLAN mapped to the VNI.
-func (v VLANVNI) target(c *fabric.Configuration) bool {
-	if c == nil || !gatewayContext(c, v.VLAN, v.VRF, v.Address) || !slices.Equal(c.Interfaces[sviName(v.VLAN)].Addresses, []string{v.Address}) {
-		return false
-	}
-	key := fmt.Sprint(v.VNI)
-	member, ok := c.NVE.Members[key]
-	if !ok || member.AssociateVRF == nil || *member.AssociateVRF {
-		return false
-	}
-	if e, ok := c.EVPN[key]; !ok || e.Type != "l2" {
-		return false
-	}
-	for vlan, mapped := range c.VLANVNIs {
-		if vlan != fmt.Sprint(v.VLAN) && mapped != nil && *mapped == v.VNI {
-			return false
-		}
-	}
-	return true
-}
-
+// Eligible checks whether the current configuration meets the change prerequisites.
 func (v VLANVNI) Eligible(c *fabric.Configuration) error {
 	if c == nil {
 		return errIneligible
@@ -276,6 +260,7 @@ func (v VLANVNI) Eligible(c *fabric.Configuration) error {
 	return nil
 }
 
+// Satisfied checks whether the target configuration contains the proposed state.
 func (v VLANVNI) Satisfied(c *fabric.Configuration) error {
 	if _, ok := mappedSVI(c, v.VLAN, v.VNI); !ok || !v.target(c) {
 		return errTarget
@@ -283,6 +268,7 @@ func (v VLANVNI) Satisfied(c *fabric.Configuration) error {
 	return nil
 }
 
+// Preserved checks that unrelated configuration remains unchanged.
 func (v VLANVNI) Preserved(before, after *fabric.Configuration) error {
 	return preserved(before, after, func(c *fabric.Configuration) { delete(c.VLANVNIs, fmt.Sprint(v.VLAN)) })
 }
@@ -300,21 +286,10 @@ type SVIACL struct {
 	PreviousBinding *string             `json:"previous_binding"`
 }
 
+// Kind identifies the configuration change kind.
 func (SVIACL) Kind() netchange.Kind { return KindSVIACL }
 
-// policy resolves the change's own rules and address groups.
-func (a SVIACL) policy() *fabric.ACLPolicy {
-	groups := a.AddressGroups
-	if groups == nil {
-		groups = map[string][]string{}
-	}
-	p, _ := (&fabric.Configuration{ACLs: map[string][]fabric.ACLEntry{a.ACL: a.Entries}, AddressGroups: groups}).ResolveACL(a.ACL)
-	if p == nil || !maps.EqualFunc(p.AddressGroups, groups, slices.Equal) {
-		return nil
-	}
-	return p
-}
-
+// Validate checks that the proposed change has valid target values.
 func (a SVIACL) Validate() error {
 	if err := validVLANVNI(a.VLAN, a.VNI); err != nil {
 		return err
@@ -340,6 +315,7 @@ func (a SVIACL) Validate() error {
 	return nil
 }
 
+// Render returns the configuration and rollback commands after validation.
 func (a SVIACL) Render() (netchange.Script, error) {
 	if err := a.Validate(); err != nil {
 		return netchange.Script{}, err
@@ -368,23 +344,11 @@ func (a SVIACL) Render() (netchange.Script, error) {
 	return netchange.Script{Commands: commands, Rollback: append(rollback, "end")}, nil
 }
 
-// isolated: every existing binding of the ACL is this SVI and direction,
-// so creating it cannot change other interfaces.
-func (a SVIACL) isolated(c *fabric.Configuration) bool {
-	for name, iface := range c.Interfaces {
-		for direction, bound := range iface.ACLBindings {
-			if bound == a.ACL && (name != sviName(a.VLAN) || direction != a.Direction) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
 func samePolicy(x, y *fabric.ACLPolicy) bool {
 	return x != nil && y != nil && x.Key() == y.Key()
 }
 
+// Eligible checks whether the current configuration meets the change prerequisites.
 func (a SVIACL) Eligible(c *fabric.Configuration) error {
 	svi, ok := mappedSVI(c, a.VLAN, a.VNI)
 	want := a.policy()
@@ -408,6 +372,7 @@ func (a SVIACL) Eligible(c *fabric.Configuration) error {
 	return errIneligible
 }
 
+// Satisfied checks whether the target configuration contains the proposed state.
 func (a SVIACL) Satisfied(c *fabric.Configuration) error {
 	if _, ok := mappedSVI(c, a.VLAN, a.VNI); !ok {
 		return errTarget
@@ -422,6 +387,7 @@ func (a SVIACL) Satisfied(c *fabric.Configuration) error {
 	return nil
 }
 
+// Preserved checks that unrelated configuration remains unchanged.
 func (a SVIACL) Preserved(before, after *fabric.Configuration) error {
 	return preserved(before, after, func(c *fabric.Configuration) {
 		if svi, ok := c.Interfaces[sviName(a.VLAN)]; ok && svi.ACLBindings != nil {
@@ -508,4 +474,56 @@ func Record(c Change) (map[string]any, error) {
 	}
 	m["kind"] = string(c.Kind())
 	return m, nil
+}
+
+func (g SVIGateway) target(c *fabric.Configuration) bool {
+	return gatewayContext(c, g.VLAN, g.VRF, g.Address) && slices.Equal(c.Interfaces[sviName(g.VLAN)].Addresses, []string{g.Address})
+}
+
+// target: gateway in place, NVE L2 member and L2 EVPN for the VNI, and no
+// other VLAN mapped to the VNI.
+func (v VLANVNI) target(c *fabric.Configuration) bool {
+	if c == nil || !gatewayContext(c, v.VLAN, v.VRF, v.Address) || !slices.Equal(c.Interfaces[sviName(v.VLAN)].Addresses, []string{v.Address}) {
+		return false
+	}
+	key := fmt.Sprint(v.VNI)
+	member, ok := c.NVE.Members[key]
+	if !ok || member.AssociateVRF == nil || *member.AssociateVRF {
+		return false
+	}
+	if e, ok := c.EVPN[key]; !ok || e.Type != "l2" {
+		return false
+	}
+	for vlan, mapped := range c.VLANVNIs {
+		if vlan != fmt.Sprint(v.VLAN) && mapped != nil && *mapped == v.VNI {
+			return false
+		}
+	}
+	return true
+}
+
+// policy resolves the change's own rules and address groups.
+func (a SVIACL) policy() *fabric.ACLPolicy {
+	groups := a.AddressGroups
+	if groups == nil {
+		groups = map[string][]string{}
+	}
+	p, _ := (&fabric.Configuration{ACLs: map[string][]fabric.ACLEntry{a.ACL: a.Entries}, AddressGroups: groups}).ResolveACL(a.ACL)
+	if p == nil || !maps.EqualFunc(p.AddressGroups, groups, slices.Equal) {
+		return nil
+	}
+	return p
+}
+
+// isolated: every existing binding of the ACL is this SVI and direction,
+// so creating it cannot change other interfaces.
+func (a SVIACL) isolated(c *fabric.Configuration) bool {
+	for name, iface := range c.Interfaces {
+		for direction, bound := range iface.ACLBindings {
+			if bound == a.ACL && (name != sviName(a.VLAN) || direction != a.Direction) {
+				return false
+			}
+		}
+	}
+	return true
 }

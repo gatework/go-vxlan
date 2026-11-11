@@ -21,7 +21,7 @@ func TestDeliveryReviewerReadPinsCurrentPrompt(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	device, e := connector.New(platform.Profile(), connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: time.Second}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
+	device, e := connector.New(platform, connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: time.Second}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
 		a, b := net.Pipe()
 		go func() {
 			defer b.Close()
@@ -65,7 +65,7 @@ func TestReadAcceptsNXOSCarriageReturnPrompt(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			device, e := connector.New(platform.Profile(), connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: 100 * time.Millisecond}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
+			device, e := connector.New(platform, connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: 100 * time.Millisecond}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
 				a, b := net.Pipe()
 				go func() {
 					defer b.Close()
@@ -116,7 +116,7 @@ func TestReadRendersBodyAndRetainsReceiptEvidence(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	device, e := connector.New(platform.Profile(), connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: time.Second}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
+	device, e := connector.New(platform, connector.ConnectionConfig{Host: "fixture", LoginTimeout: time.Second, CommandTimeout: time.Second}, connector.WithTransportFactory(func(context.Context, connector.ConnectionConfig) (io.ReadWriteCloser, error) {
 		a, b := net.Pipe()
 		go func() {
 			defer b.Close()

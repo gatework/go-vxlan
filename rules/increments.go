@@ -49,8 +49,9 @@ func legacyRole(r fabric.Role) string {
 		return "leaves"
 	case fabric.RoleBorder:
 		return "borders"
+	default:
+		return "spines"
 	}
-	return "spines"
 }
 
 func present(inc *Increment, f *fabric.Fabric, role fabric.Role, vni int, verify []string) {
@@ -65,7 +66,11 @@ func present(inc *Increment, f *fabric.Fabric, role fabric.Role, vni int, verify
 		inc.Prerequisites = append(inc.Prerequisites, mappingPrerequisite)
 		inc.Impact, inc.Expected = mappingImpact, mappingExpected
 	default:
-		inc.Title = "统一 " + inc.Change.(change.SVIACL).Direction + " 方向访问控制"
+		acl, ok := inc.Change.(change.SVIACL)
+		if !ok {
+			panic("rules: ACL increment has a non-ACL change")
+		}
+		inc.Title = "统一 " + acl.Direction + " 方向访问控制"
 		inc.Prerequisites = append(inc.Prerequisites, aclPrerequisite)
 	}
 }
@@ -245,23 +250,7 @@ func gatewayIncrements(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex,
 		address = expected
 	}
 	// Context: one VRF, anycast and anycast MAC across rows, all set.
-	contexts := map[string]bool{}
-	contextOK := true
-	for _, r := range rows {
-		vrf, anycast := "", ""
-		if r.service.SVI != nil {
-			vrf = r.service.SVI.VRF
-			if r.service.SVI.Anycast != nil {
-				anycast = strconv.FormatBool(*r.service.SVI.Anycast)
-			}
-		}
-		mac := r.device.Configuration.AnycastMAC
-		contexts[vrf+"|"+anycast+"|"+mac] = true
-		if vrf == "" || anycast != "true" || mac == "" {
-			contextOK = false
-		}
-	}
-	contextOK = contextOK && len(contexts) == 1
+	contextOK := gatewayContext(rows)
 	var out []Increment
 	for i, r := range rows {
 		if single && hasSVI[i] && values[i] == expected {
@@ -295,12 +284,7 @@ func aclIncrements(vni int, rows []roleService, direction string) []Increment {
 	if len(bindings) <= 1 && len(contents) <= 1 && !unknown {
 		return nil
 	}
-	names := []string{}
-	for _, v := range views {
-		if v.bound && !slices.Contains(names, v.name) {
-			names = append(names, v.name)
-		}
-	}
+	names := boundACLNames(views)
 	if len(names) != 1 {
 		return nil
 	}
@@ -329,15 +313,7 @@ func aclIncrements(vni int, rows []roleService, direction string) []Increment {
 	if policy == nil {
 		return nil
 	}
-	vrfs := map[string]bool{}
-	for _, r := range rows {
-		vrf := ""
-		if r.service.SVI != nil {
-			vrf = r.service.SVI.VRF
-		}
-		vrfs[vrf] = true
-	}
-	if len(vrfs) != 1 {
+	if !singleServiceVRF(rows) {
 		return nil
 	}
 	var out []Increment
@@ -440,19 +416,7 @@ func inferMapping(f *fabric.Fabric, indexes map[string]*fabric.SubnetIndex, vni 
 	if len(signatures) != 1 {
 		return Increment{}, false
 	}
-	transports := map[string]bool{}
-	for _, peer := range append([]roleService{row}, donors...) {
-		vrf := donors[0].service.SVI.VRF
-		if peer.service.SVI != nil && peer.service.SVI.VRF != "" {
-			vrf = peer.service.SVI.VRF
-		}
-		sig, ok := transportSignature(peer.device.Configuration, peer.service, vni, vrf)
-		if !ok {
-			return Increment{}, false
-		}
-		transports[sig] = true
-	}
-	if len(transports) != 1 {
+	if !sameMappingTransport(row, donors, vni) {
 		return Increment{}, false
 	}
 	c := row.device.Configuration
@@ -502,4 +466,62 @@ func incrementRule(verify Verifier) fabricRule {
 		}
 		return out
 	})
+}
+
+func gatewayContext(rows []roleService) bool {
+	contexts := map[string]bool{}
+	contextOK := true
+	for _, r := range rows {
+		vrf, anycast := "", ""
+		if r.service.SVI != nil {
+			vrf = r.service.SVI.VRF
+			if r.service.SVI.Anycast != nil {
+				anycast = strconv.FormatBool(*r.service.SVI.Anycast)
+			}
+		}
+		mac := r.device.Configuration.AnycastMAC
+		contexts[vrf+"|"+anycast+"|"+mac] = true
+		if vrf == "" || anycast != "true" || mac == "" {
+			contextOK = false
+		}
+	}
+	return contextOK && len(contexts) == 1
+}
+
+func boundACLNames(views []aclView) []string {
+	names := []string{}
+	for _, v := range views {
+		if v.bound && !slices.Contains(names, v.name) {
+			names = append(names, v.name)
+		}
+	}
+	return names
+}
+
+func sameMappingTransport(row roleService, donors []roleService, vni int) bool {
+	transports := map[string]bool{}
+	for _, peer := range append([]roleService{row}, donors...) {
+		vrf := donors[0].service.SVI.VRF
+		if peer.service.SVI != nil && peer.service.SVI.VRF != "" {
+			vrf = peer.service.SVI.VRF
+		}
+		sig, ok := transportSignature(peer.device.Configuration, peer.service, vni, vrf)
+		if !ok {
+			return false
+		}
+		transports[sig] = true
+	}
+	return len(transports) == 1
+}
+
+func singleServiceVRF(rows []roleService) bool {
+	vrfs := map[string]bool{}
+	for _, r := range rows {
+		vrf := ""
+		if r.service.SVI != nil {
+			vrf = r.service.SVI.VRF
+		}
+		vrfs[vrf] = true
+	}
+	return len(vrfs) == 1
 }

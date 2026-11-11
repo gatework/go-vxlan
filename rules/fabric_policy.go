@@ -168,33 +168,7 @@ func aclCatalog(f *fabric.Fabric, dependency bool) []assess.Finding {
 			}
 		}
 		for _, name := range slices.Sorted(maps.Keys(names)) {
-			semantics, identities := map[string]bool{}, map[string]bool{}
-			var unknown []string
-			for _, d := range members {
-				entries, ok := d.Configuration.ACLs[name]
-				if !ok {
-					continue
-				}
-				policy, _ := d.Configuration.ResolveACL(name)
-				var rules []fabric.ACLRule
-				if policy != nil {
-					rules = policy.Rules
-				} else {
-					rules = fabric.OrderedRules(entries)
-				}
-				semantics[fmt.Sprint(rules == nil, rules)] = true
-				identities[policy.Key()] = true
-				if policy == nil {
-					unknown = append(unknown, d.Host)
-				}
-			}
-			subject := fabricSubject(f).Child("role", string(role)).Child("acl", name)
-			if dependency && len(unknown) > 0 {
-				out = append(out, assess.Finding{Subject: subject, Actual: unknown, Detail: "依赖对象未验证（包括尚未挂载的定义）"})
-			}
-			if !dependency && (len(semantics) > 1 || len(identities) > 1) {
-				out = append(out, assess.Finding{Subject: subject, Detail: "同名 ACL 的有序规则或依赖对象不同（包括尚未挂载的定义）"})
-			}
+			out = append(out, aclNameFindings(f, role, members, name, dependency)...)
 		}
 	}
 	return out
@@ -392,3 +366,35 @@ var vlanMappingMissing = assess.NewRule(assess.RuleMeta{
 		return out
 	})
 })
+
+func aclNameFindings(f *fabric.Fabric, role fabric.Role, members []*fabric.Device, name string, dependency bool) []assess.Finding {
+	var out []assess.Finding
+	semantics, identities := map[string]bool{}, map[string]bool{}
+	var unknown []string
+	for _, d := range members {
+		entries, ok := d.Configuration.ACLs[name]
+		if !ok {
+			continue
+		}
+		policy, _ := d.Configuration.ResolveACL(name)
+		var rules []fabric.ACLRule
+		if policy != nil {
+			rules = policy.Rules
+		} else {
+			rules = fabric.OrderedRules(entries)
+		}
+		semantics[fmt.Sprint(rules == nil, rules)] = true
+		identities[policy.Key()] = true
+		if policy == nil {
+			unknown = append(unknown, d.Host)
+		}
+	}
+	subject := fabricSubject(f).Child("role", string(role)).Child("acl", name)
+	if dependency && len(unknown) > 0 {
+		out = append(out, assess.Finding{Subject: subject, Actual: unknown, Detail: "依赖对象未验证（包括尚未挂载的定义）"})
+	}
+	if !dependency && (len(semantics) > 1 || len(identities) > 1) {
+		out = append(out, assess.Finding{Subject: subject, Detail: "同名 ACL 的有序规则或依赖对象不同（包括尚未挂载的定义）"})
+	}
+	return out
+}

@@ -25,7 +25,7 @@ const PlanSchemaVersion = 3
 // Queries is the selected profile's command catalog: collection commands by
 // dimension and review-only verification commands by scope.
 type Queries interface {
-	Command(string) string
+	Command(name string) string
 	VerificationCommands(scope string) []string
 }
 
@@ -56,60 +56,16 @@ func Review(ctx context.Context, r *report.Report, options ReviewOptions) (vxlan
 	if err != nil {
 		return nil, err
 	}
-	increments := map[string][]rules.Increment{}
-	if options.Queries != nil {
-		for _, f := range model.Fabrics {
-			for _, inc := range rules.Increments(f, options.Queries) {
-				increments[inc.Host] = append(increments[inc.Host], inc)
-			}
-		}
-	}
+	increments := reviewIncrements(model, options.Queries)
 	entries, events := []any{}, []string{}
 	changes := vxlan.Record{}
 	for _, src := range sources {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		device := record.Map(src.Document["device"])
-		host := record.String(device["host"])
-		sourceHash := fmt.Sprintf("%x", sha256.Sum256(src.Body))
-		name := report.Basename(device)
-		findings := deviceFindings(assessment, host)
-		entry := vxlan.Record{"device": device, "counts": severityCounts(findings), "basename": name, "report": "devices/" + name + ".txt",
-			"source": src.Path, "source_sha256": sourceHash, "script": nil, "script_sha256": nil, "plans": []string{}}
-		var planned []plannedIncrement
-		if config := configuration.CompleteConfig(src.Document); scripts && config != nil {
-			expected, err := vxlan.Fingerprint(config)
-			if err != nil {
-				return nil, err
-			}
-			for _, inc := range increments[host] {
-				id, item, err := planItem(name, device, expected, src.Path, sourceHash, inc)
-				if err != nil {
-					return nil, err
-				}
-				changes[id] = item
-				entry["plans"] = append(record.Texts(entry["plans"]), id)
-				planned = append(planned, plannedIncrement{id, inc})
-			}
-		}
-		if len(planned) > 0 {
-			body := []byte(candidateScript(planned))
-			entry["script"] = "scripts/" + name + ".cfg"
-			entry["script_sha256"] = fmt.Sprintf("%x", sha256.Sum256(body))
-			if err := r.Publish(ctx, record.String(entry["script"]), body); err != nil {
-				return nil, err
-			}
-		}
-		if err := r.Publish(ctx, record.String(entry["report"]), []byte(deviceReport(device, entry, findings, planned))); err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-		event, err := json.Marshal(vxlan.Record{"event": "device_reviewed", "host": host, "source_sha256": sourceHash, "counts": entry["counts"], "report": entry["report"], "script": entry["script"], "executed": false})
+		host := record.String(record.Map(src.Document["device"])["host"])
+		entry, event, err := reviewSource(ctx, r, src, assessment, increments[host], scripts, changes)
 		if err != nil {
 			return nil, err
 		}
-		events = append(events, string(event))
+		entries, events = append(entries, entry), append(events, event)
 	}
 	plan := vxlan.Record{"schema_version": PlanSchemaVersion, "platform": "cisco_nxos", "mode": "review", "assessment": "assessment.json", "devices": entries, "changes": changes}
 	body, err := report.EncodeJSON(plan)
@@ -257,4 +213,61 @@ func assessSources(ctx context.Context, sources []report.Source, policy vxlan.Re
 	}
 	report, err := assessor.AssessWith(ctx, model, inputs)
 	return report, model, err
+}
+
+func reviewSource(ctx context.Context, r *report.Report, src report.Source, assessment rules.Report, increments []rules.Increment, scripts bool, changes vxlan.Record) (vxlan.Record, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	device := record.Map(src.Document["device"])
+	host := record.String(device["host"])
+	sourceHash := fmt.Sprintf("%x", sha256.Sum256(src.Body))
+	name := report.Basename(device)
+	findings := deviceFindings(assessment, host)
+	entry := vxlan.Record{"device": device, "counts": severityCounts(findings), "basename": name, "report": "devices/" + name + ".txt",
+		"source": src.Path, "source_sha256": sourceHash, "script": nil, "script_sha256": nil, "plans": []string{}}
+	var planned []plannedIncrement
+	if config := configuration.CompleteConfig(src.Document); scripts && config != nil {
+		expected, err := vxlan.Fingerprint(config)
+		if err != nil {
+			return nil, "", err
+		}
+		for _, inc := range increments {
+			id, item, err := planItem(name, device, expected, src.Path, sourceHash, inc)
+			if err != nil {
+				return nil, "", err
+			}
+			changes[id] = item
+			entry["plans"] = append(record.Texts(entry["plans"]), id)
+			planned = append(planned, plannedIncrement{id, inc})
+		}
+	}
+	if len(planned) > 0 {
+		body := []byte(candidateScript(planned))
+		entry["script"] = "scripts/" + name + ".cfg"
+		entry["script_sha256"] = fmt.Sprintf("%x", sha256.Sum256(body))
+		if err := r.Publish(ctx, record.String(entry["script"]), body); err != nil {
+			return nil, "", err
+		}
+	}
+	if err := r.Publish(ctx, record.String(entry["report"]), []byte(deviceReport(device, entry, findings, planned))); err != nil {
+		return nil, "", err
+	}
+	event, err := json.Marshal(vxlan.Record{"event": "device_reviewed", "host": host, "source_sha256": sourceHash, "counts": entry["counts"], "report": entry["report"], "script": entry["script"], "executed": false})
+	if err != nil {
+		return nil, "", err
+	}
+	return entry, string(event), nil
+}
+
+func reviewIncrements(model *fabric.Model, queries Queries) map[string][]rules.Increment {
+	increments := map[string][]rules.Increment{}
+	if queries != nil {
+		for _, f := range model.Fabrics {
+			for _, inc := range rules.Increments(f, queries) {
+				increments[inc.Host] = append(increments[inc.Host], inc)
+			}
+		}
+	}
+	return increments
 }

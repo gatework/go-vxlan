@@ -11,10 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/gatework/go-net-connector/connector"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
-	"golang.org/x/sys/unix"
 )
 
 func TestPrepareResources(t *testing.T) {

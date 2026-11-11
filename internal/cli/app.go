@@ -8,16 +8,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/pflag"
+	"golang.org/x/term"
+
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/parser"
-	"github.com/spf13/pflag"
-	"golang.org/x/term"
 )
 
-const Version = "0.3.1"
+// Version is the release version reported by the CLI.
+const Version = "0.4.0"
 
+// App owns CLI streams, runtime dependencies and path resolution.
 type App struct {
 	profiles           *parser.Registry
 	Input              io.Reader
@@ -29,37 +32,7 @@ type App struct {
 	Terminal           func() bool
 }
 
-func (a *App) defaults() {
-	if a.Input == nil {
-		a.Input = os.Stdin
-	}
-	if a.Output == nil {
-		a.Output = os.Stdout
-	}
-	if a.Error == nil {
-		a.Error = os.Stderr
-	}
-	if a.CWD == "" {
-		a.CWD, _ = os.Getwd()
-	}
-	if a.Home == "" {
-		a.Home, _ = os.UserHomeDir()
-	}
-	dependencies := bootstrap.NewDependencies(a.Open)
-	a.Open, a.profiles = dependencies.Open, dependencies.Profiles
-}
-func (a *App) tty() bool {
-	if a.Terminal != nil {
-		return a.Terminal()
-	}
-	for _, v := range []any{a.Input, a.Output, a.Error} {
-		f, ok := v.(interface{ Fd() uintptr })
-		if !ok || !term.IsTerminal(int(f.Fd())) {
-			return false
-		}
-	}
-	return true
-}
+// Run dispatches CLI arguments and returns the process exit status.
 func (a *App) Run(ctx context.Context, args []string) (code int) {
 	a.defaults()
 	output, errout := a.Output, a.Error
@@ -125,7 +98,7 @@ func (a *App) collectOptions(ctx context.Context, f *pflag.FlagSet) (bootstrap.C
 		values, _ := f.GetStringArray(flag)
 		parts := record.Texts(overrides[key])
 		for _, v := range values {
-			for _, item := range strings.Split(v, ",") {
+			for item := range strings.SplitSeq(v, ",") {
 				item = strings.TrimSpace(item)
 				if item == "" {
 					return bootstrap.Config{}, fmt.Errorf("列表不能包含空项")
@@ -192,4 +165,37 @@ func (w *checkedWriter) Fd() uintptr {
 		return f.Fd()
 	}
 	return ^uintptr(0)
+}
+
+func (a *App) defaults() {
+	if a.Input == nil {
+		a.Input = os.Stdin
+	}
+	if a.Output == nil {
+		a.Output = os.Stdout
+	}
+	if a.Error == nil {
+		a.Error = os.Stderr
+	}
+	if a.CWD == "" {
+		a.CWD, _ = os.Getwd()
+	}
+	if a.Home == "" {
+		a.Home, _ = os.UserHomeDir()
+	}
+	dependencies := bootstrap.NewDependencies(a.Open)
+	a.Open, a.profiles = dependencies.Open, dependencies.Profiles
+}
+
+func (a *App) tty() bool {
+	if a.Terminal != nil {
+		return a.Terminal()
+	}
+	for _, v := range []any{a.Input, a.Output, a.Error} {
+		f, ok := v.(interface{ Fd() uintptr })
+		if !ok || !term.IsTerminal(int(f.Fd())) {
+			return false
+		}
+	}
+	return true
 }

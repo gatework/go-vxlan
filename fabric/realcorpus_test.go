@@ -105,7 +105,7 @@ func TestRealConfigurationsAreModeled(t *testing.T) {
 // statistics never carry addresses, names or secrets.
 func statementKind(line string) string {
 	var words []string
-	for _, w := range strings.Fields(line) {
+	for w := range strings.FieldsSeq(line) {
 		// Two keywords at most: a third word can be a name or secret.
 		if len(words) == 2 || strings.ContainsAny(w, "0123456789./:") {
 			break

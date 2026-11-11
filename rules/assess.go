@@ -13,7 +13,7 @@ import (
 
 // Commands resolves collection commands for verification hints; the
 // selected parser.Profile satisfies it.
-type Commands interface{ Command(string) string }
+type Commands interface{ Command(name string) string }
 
 type verify struct{ c Commands }
 
@@ -187,35 +187,9 @@ func (a *Assessor) AssessWith(ctx context.Context, m *fabric.Model, inputs Input
 		}
 	}
 	if prev := inputs.Previous; prev != nil {
-		before := map[string]*fabric.Device{}
-		for _, d := range prev.Devices {
-			before[d.Host] = d
+		if err := a.assessChanges(ctx, m, prev, &r, add); err != nil {
+			return Report{}, err
 		}
-		now := map[string]bool{}
-		for _, d := range m.Devices {
-			now[d.Host] = true
-			p, ok := before[d.Host]
-			if !ok {
-				r.Appeared = append(r.Appeared, d.Host)
-				continue
-			}
-			c := &Change{Previous: p, Current: d}
-			as, err := a.temporal.Run(ctx, c, c.Coverage())
-			if err != nil {
-				return Report{}, err
-			}
-			r.Changes = append(r.Changes, DeviceAssessment{Device: d.Identity, Role: d.Role, Coverage: c.Coverage(), Assessment: as})
-			add(as)
-		}
-		for _, d := range prev.Devices {
-			if !now[d.Host] {
-				r.Disappeared = append(r.Disappeared, d.Host)
-			}
-		}
-		slices.Sort(r.Appeared)
-		slices.Sort(r.Disappeared)
-		// A device that stopped reporting cannot be vouched for.
-		r.Incomplete = r.Incomplete || len(r.Disappeared) > 0
 	}
 	if len(m.Fabrics) > 0 {
 		for _, d := range m.Unassigned {
@@ -252,4 +226,37 @@ func RuleIDs() []assess.RuleID {
 		ids = append(ids, r.Meta().ID)
 	}
 	return slices.Sorted(slices.Values(ids))
+}
+
+func (a *Assessor) assessChanges(ctx context.Context, m, prev *fabric.Model, r *Report, add func(assess.Assessment)) error {
+	before := map[string]*fabric.Device{}
+	for _, d := range prev.Devices {
+		before[d.Host] = d
+	}
+	now := map[string]bool{}
+	for _, d := range m.Devices {
+		now[d.Host] = true
+		p, ok := before[d.Host]
+		if !ok {
+			r.Appeared = append(r.Appeared, d.Host)
+			continue
+		}
+		c := &Change{Previous: p, Current: d}
+		as, err := a.temporal.Run(ctx, c, c.Coverage())
+		if err != nil {
+			return err
+		}
+		r.Changes = append(r.Changes, DeviceAssessment{Device: d.Identity, Role: d.Role, Coverage: c.Coverage(), Assessment: as})
+		add(as)
+	}
+	for _, d := range prev.Devices {
+		if !now[d.Host] {
+			r.Disappeared = append(r.Disappeared, d.Host)
+		}
+	}
+	slices.Sort(r.Appeared)
+	slices.Sort(r.Disappeared)
+	// A device that stopped reporting cannot be vouched for.
+	r.Incomplete = r.Incomplete || len(r.Disappeared) > 0
+	return nil
 }

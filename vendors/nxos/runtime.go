@@ -3,6 +3,7 @@ package nxos
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/netip"
 	"regexp"
 	"strconv"
@@ -24,11 +25,19 @@ var rtRegexes sync.Map
 
 func rtRE(pattern string) *regexp.Regexp {
 	if v, ok := rtRegexes.Load(pattern); ok {
-		return v.(*regexp.Regexp)
+		compiled, ok := v.(*regexp.Regexp)
+		if !ok {
+			panic("nxos: invalid compiled expression cache entry")
+		}
+		return compiled
 	}
 	re := regexp.MustCompile(pattern)
 	v, _ := rtRegexes.LoadOrStore(pattern, re)
-	return v.(*regexp.Regexp)
+	compiled, ok := v.(*regexp.Regexp)
+	if !ok {
+		panic("nxos: invalid compiled expression cache entry")
+	}
+	return compiled
 }
 func rtMatch(pattern, s string) bool    { return rtRE(pattern).MatchString(s) }
 func rtFind(pattern, s string) []string { return rtRE(pattern).FindStringSubmatch(s) }
@@ -163,7 +172,7 @@ func rtTerminalLine(text string) int {
 		if rtMatch(`(?i)--[ \t]*More[ \t]*--`, s) {
 			return i + 1
 		}
-		for j := 0; j < len(s); j++ {
+		for j := range len(s) {
 			c := s[j]
 			if c < 32 && c != '\t' && (c != '\r' || j != len(s)-1 || len(lines) == 1) {
 				return i + 1
@@ -250,7 +259,7 @@ func rtNormalizeWrapped(name, text string) string {
 		if len(out) > 0 {
 			prev = rtTrim(out[len(out)-1])
 		}
-		join := false
+		var join bool
 		if name == "bgp_neighbors" {
 			join = strings.HasSuffix(prev, "State/") && tail == "PfxRcd"
 		} else {
@@ -315,28 +324,7 @@ func (p *rtParser) content(text string, complete bool) {
 		}
 	}
 	if !scoped {
-		switch p.name {
-		case "nve_peers":
-			p.nvePeers(text)
-		case "nve_vnis":
-			p.nveVnis(text)
-		case "interfaces":
-			p.interfaces(text)
-		case "ospf_neighbors":
-			p.ospf(text)
-		case "bgp_neighbors":
-			p.bgp(text)
-		case "port_channels":
-			p.ports(text)
-		case "mac_addresses":
-			p.macs(text)
-		case "cdp_neighbors":
-			p.cdp(text)
-		case "vpc":
-			p.vpc(text)
-		case "l2route_macs", "l2route_mac_ips":
-			p.routes(text)
-		}
+		p.parseContent(text)
 	}
 	if p.name == "bgp_neighbors" {
 		p.bgpIdentities(text)
@@ -420,9 +408,7 @@ func (p *rtParser) ospf(text string) {
 			return
 		}
 		r := rtFields("neighbor_id priority state uptime address interface", m[1:])
-		for k, v := range scope {
-			r[k] = v
-		}
+		maps.Copy(r, scope)
 		r["priority"] = priority
 		r["state"] = strings.ReplaceAll(strings.ToLower(m[3]), " ", "")
 		p.rows = append(p.rows, r)
@@ -433,4 +419,38 @@ func (p *rtParser) ospf(text string) {
 	if len(p.rows) == 0 && len(totals) == 1 && rtEqualNumber(totals[0], "0") {
 		p.empty = true
 	}
+}
+
+func (p *rtParser) parseContent(text string) {
+	switch p.name {
+	case "nve_peers":
+		p.nvePeers(text)
+	case "nve_vnis":
+		p.nveVnis(text)
+	case "interfaces":
+		p.interfaces(text)
+	case "ospf_neighbors":
+		p.ospf(text)
+	case "bgp_neighbors":
+		p.bgp(text)
+	case "port_channels":
+		p.ports(text)
+	case "mac_addresses":
+		p.macs(text)
+	case "cdp_neighbors":
+		p.cdp(text)
+	case "vpc":
+		p.vpc(text)
+	case "l2route_macs", "l2route_mac_ips":
+		p.routes(text)
+	}
+}
+
+// parsedValue enforces parser-owned field types without silently accepting malformed internal state.
+func parsedValue[T any](value any) T {
+	result, ok := value.(T)
+	if !ok {
+		panic("nxos: parser field has an invalid internal type")
+	}
+	return result
 }

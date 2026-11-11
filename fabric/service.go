@@ -94,29 +94,7 @@ func (c *Configuration) Services() []Service {
 			vlans = []int{-1}
 		}
 		for _, vlan := range vlans {
-			s := Service{VNI: vni, Member: c.EffectiveMember(vni)}
-			if vlan >= 0 {
-				s.VLAN = new(vlan)
-				if svi, ok := c.Interfaces["Vlan"+strconv.Itoa(vlan)]; ok {
-					s.SVI = &svi
-				}
-			} else {
-				s.Missing = append(s.Missing, "VLAN")
-			}
-			switch {
-			case s.Member == nil:
-				s.Missing = append(s.Missing, "NVE")
-			case True(s.Member.AssociateVRF):
-				s.Missing = append(s.Missing, "NVE L2")
-			}
-			if e, ok := c.EVPN[strconv.Itoa(vni)]; ok {
-				s.EVPN = &e
-				if e.Type != "l2" {
-					s.Missing = append(s.Missing, "EVPN L2")
-				}
-			} else if c.NVOverlayEVPN {
-				s.Missing = append(s.Missing, "EVPN")
-			}
+			s := c.service(vni, vlan)
 			out = append(out, s)
 		}
 	}
@@ -137,4 +115,31 @@ func (c *Configuration) VLANsForVNI(vni int) []int {
 	}
 	slices.Sort(out)
 	return out
+}
+
+func (c *Configuration) service(vni, vlan int) Service {
+	s := Service{VNI: vni, Member: c.EffectiveMember(vni)}
+	if vlan >= 0 {
+		s.VLAN = new(vlan)
+		if svi, ok := c.Interfaces["Vlan"+strconv.Itoa(vlan)]; ok {
+			s.SVI = &svi
+		}
+	} else {
+		s.Missing = append(s.Missing, "VLAN")
+	}
+	switch {
+	case s.Member == nil:
+		s.Missing = append(s.Missing, "NVE")
+	case True(s.Member.AssociateVRF):
+		s.Missing = append(s.Missing, "NVE L2")
+	}
+	if e, ok := c.EVPN[strconv.Itoa(vni)]; ok {
+		s.EVPN = &e
+		if e.Type != "l2" {
+			s.Missing = append(s.Missing, "EVPN L2")
+		}
+	} else if c.NVOverlayEVPN {
+		s.Missing = append(s.Missing, "EVPN")
+	}
+	return s
 }

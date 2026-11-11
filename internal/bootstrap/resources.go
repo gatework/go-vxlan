@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Resource preparation failures.
 var (
 	ErrResourceParallel = errors.New("parallel must be between 0 and 500")
 	ErrResourceLimit    = errors.New("insufficient local file descriptor limit")
@@ -29,7 +30,7 @@ func (e *resourceLimitError) Unwrap() error { return ErrResourceLimit }
 // Concurrent batches share the process limit, so updates must be serialized.
 var resourceLimitMu sync.Mutex
 
-// prepareResources reserves 128 base descriptors and 16 per active device,
+// PrepareResources reserves 128 base descriptors and 16 per active device,
 // matching the existing Ruby/connector policy. It raises only the soft limit,
 // within the existing hard limit. Callers pass min(parallel, selected devices).
 func PrepareResources(ctx context.Context, parallel int) error {

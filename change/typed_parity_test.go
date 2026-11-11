@@ -57,6 +57,7 @@ func typedConfig(t *testing.T, cfg vxlan.Record) (*fabric.Configuration, bool) {
 }
 
 func typedEligible(t *testing.T, c change.Change, cfg vxlan.Record) (bool, bool) {
+	t.Helper()
 	tc, ok := typedConfig(t, cfg)
 	if !ok {
 		return false, false
@@ -65,6 +66,7 @@ func typedEligible(t *testing.T, c change.Change, cfg vxlan.Record) (bool, bool)
 }
 
 func typedSatisfied(t *testing.T, c change.Change, after, before vxlan.Record) (bool, bool) {
+	t.Helper()
 	a, okA := typedConfig(t, after)
 	b, okB := typedConfig(t, before)
 	if !okA || !okB {

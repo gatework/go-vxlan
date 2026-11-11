@@ -122,10 +122,8 @@ func (idx *SubnetIndex) Conflicts(address, vrf string, vni *int, except string) 
 		same := (e.vni == nil) == (vni == nil) && (e.vni == nil || *e.vni == *vni)
 		return !same && e.iface != except
 	}
-	for _, e := range idx.invalid[vrf] {
-		if relevant(e) {
-			return nil, ErrInvalidAddress
-		}
+	if slices.ContainsFunc(idx.invalid[vrf], relevant) {
+		return nil, ErrInvalidAddress
 	}
 	g := idx.groups[vrf][network.Addr().Is4()]
 	if g == nil {

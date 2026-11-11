@@ -2,11 +2,12 @@ package nxos
 
 import (
 	"encoding/json"
-	"github.com/gatework/go-vxlan/internal/record"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/gatework/go-vxlan/internal/record"
 
 	vxlan "github.com/gatework/go-vxlan"
 )

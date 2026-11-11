@@ -31,39 +31,7 @@ func (s *cfgState) finalize(d vxlan.Record) {
 		}
 	}
 	interfaces := record.Map(d["interfaces"])
-	for _, name := range s.keys(interfaces) {
-		v := record.Map(interfaces[name])
-		src, ok := v["unnumbered_interface"].(string)
-		if !ok {
-			continue
-		}
-		matches := []vxlan.Record{}
-		for n, x := range interfaces {
-			if strings.EqualFold(n, src) {
-				matches = append(matches, record.Map(x))
-			}
-		}
-		valid := false
-		if len(matches) == 1 {
-			source := matches[0]
-			a := record.StringSlice(source["addresses"])
-			vrf := v["vrf"]
-			if vrf == nil {
-				vrf = "default"
-			}
-			sv := source["vrf"]
-			if sv == nil {
-				sv = "default"
-			}
-			if len(a) == 1 && len(record.StringSlice(v["addresses"])) == 0 && source["unnumbered_interface"] == nil && vrf == sv {
-				record.Map(d["unnumbered_addresses"])[name] = []string{strings.Split(a[0], "/")[0] + "/32"}
-				valid = true
-			}
-		}
-		if !valid {
-			s.issues = append(s.issues, vxlan.Record{"code": "unresolved_unnumbered_interface", "interface": name})
-		}
-	}
+	s.resolveUnnumbered(d, interfaces)
 	enabled, disabled := record.StringSlice(d["features"]), record.StringSlice(d["disabled_features"])
 	conflict := false
 	for _, a := range enabled {
@@ -101,4 +69,40 @@ func (s *cfgState) finalize(d vxlan.Record) {
 		segments = append(segments, vxlan.Record{"vlan_id": id, "vni": vni, "vrf": v["vrf"], "prefix": cfgPrefix(addresses[0], "ipv4", false), "gateway": strings.Split(addresses[0], "/")[0], "anycast": v["anycast"], "acl_bindings": v["acl_bindings"]})
 	}
 	d["segments"] = segments
+}
+
+func (s *cfgState) resolveUnnumbered(d, interfaces vxlan.Record) {
+	for _, name := range s.keys(interfaces) {
+		v := record.Map(interfaces[name])
+		src, ok := v["unnumbered_interface"].(string)
+		if !ok {
+			continue
+		}
+		matches := []vxlan.Record{}
+		for n, x := range interfaces {
+			if strings.EqualFold(n, src) {
+				matches = append(matches, record.Map(x))
+			}
+		}
+		valid := false
+		if len(matches) == 1 {
+			source := matches[0]
+			a := record.StringSlice(source["addresses"])
+			vrf := v["vrf"]
+			if vrf == nil {
+				vrf = "default"
+			}
+			sv := source["vrf"]
+			if sv == nil {
+				sv = "default"
+			}
+			if len(a) == 1 && len(record.StringSlice(v["addresses"])) == 0 && source["unnumbered_interface"] == nil && vrf == sv {
+				record.Map(d["unnumbered_addresses"])[name] = []string{strings.Split(a[0], "/")[0] + "/32"}
+				valid = true
+			}
+		}
+		if !valid {
+			s.issues = append(s.issues, vxlan.Record{"code": "unresolved_unnumbered_interface", "interface": name})
+		}
+	}
 }

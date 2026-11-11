@@ -58,7 +58,7 @@ type Expectation struct {
 // Baseline is the frozen operational intent of one or more fabrics.
 type Baseline struct {
 	SchemaVersion int                    `yaml:"schema_version" json:"schema_version"`
-	Defaults      Expectation            `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	Defaults      Expectation            `yaml:"defaults,omitempty" json:"defaults,omitempty"` //nolint:modernize // Preserve the schema serialization of the defaults object.
 	Fabrics       map[string]Expectation `yaml:"fabrics,omitempty" json:"fabrics,omitempty"`
 }
 

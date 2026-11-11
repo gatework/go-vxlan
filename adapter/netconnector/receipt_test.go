@@ -27,12 +27,12 @@ import (
 const receiptCommand = "show running-config"
 
 // Use the real command/response engine, with only its byte transport replaced.
-func readDevice(t *testing.T, profile connector.Profile, serve func(net.Conn) error) *connector.Device {
+func readDevice(t *testing.T, profile connector.Driver, serve func(net.Conn) error) *connector.Device {
 	t.Helper()
 	return readDeviceTransport(t, profile, serve, func(conn net.Conn) io.ReadWriteCloser { return conn })
 }
 
-func readDeviceTransport(t *testing.T, profile connector.Profile, serve func(net.Conn) error, transport func(net.Conn) io.ReadWriteCloser) *connector.Device {
+func readDeviceTransport(t *testing.T, profile connector.Driver, serve func(net.Conn) error, transport func(net.Conn) io.ReadWriteCloser) *connector.Device {
 	t.Helper()
 	done := make(chan error, 1)
 	device, err := connector.New(profile, connector.ConnectionConfig{
@@ -112,7 +112,7 @@ func TestReadPreservesBodyFraming(t *testing.T) {
 		{"repeated_command", receiptCommand + "\r\n" + receiptCommand + "\r\nleaf#", receiptCommand},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			device := readDevice(t, platform.Profile(), func(peer net.Conn) error {
+			device := readDevice(t, platform, func(peer net.Conn) error {
 				if _, err := io.WriteString(peer, test.wire); err != nil {
 					return err
 				}
@@ -157,7 +157,7 @@ func TestBorrowedReadPreservesAcceptedBodyAndCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile := platform.Profile()
+	profile := connector.StaticDriver{Grammar: platform.Terminal()}
 	hookErr, closeErr := errors.New("private hook"), errors.New("private close")
 	profile.AfterCommand = func(context.Context, connector.Command, connector.StepResult, connector.Executor) error {
 		return hookErr
@@ -194,7 +194,7 @@ func TestCollectionRetainsInternalCleanupFailureAfterSuccessfulRetry(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile := platform.Profile()
+	profile := connector.StaticDriver{Grammar: platform.Terminal()}
 	hookErr := errors.New("private hook detail")
 	closeErr := errors.New("private cleanup detail")
 	profile.AfterCommand = func(context.Context, connector.Command, connector.StepResult, connector.Executor) error {
@@ -270,7 +270,7 @@ func TestReadRetainsFailureEvidenceAndAcceptedFacts(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			profile := platform.Profile()
+			profile := connector.StaticDriver{Grammar: platform.Terminal()}
 			callbackErr := errors.New("private callback detail")
 			if test.hook == "coded" {
 				callbackErr = codedHookError{callbackErr}
@@ -349,7 +349,7 @@ func TestReadFingerprintsRawPagedEncodedResponse(t *testing.T) {
 	}
 	first := receiptCommand + "\r\n description \xd6\xd0\xce\xc4\r\n--More--"
 	last := "\r\n description \xba\xcb\xd0\xc4\r\nleaf#"
-	device := readDevice(t, platform.Profile(), func(peer net.Conn) error {
+	device := readDevice(t, platform, func(peer net.Conn) error {
 		if _, err := io.WriteString(peer, first); err != nil {
 			return err
 		}
@@ -390,7 +390,7 @@ func TestReadKeepsHookAttemptsWithoutExposingHookText(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile := platform.Profile()
+	profile := connector.StaticDriver{Grammar: platform.Terminal()}
 	profile.AfterCommand = func(ctx context.Context, _ connector.Command, _ connector.StepResult, executor connector.Executor) error {
 		if _, err := executor.Execute(ctx, connector.Command{
 			Text: "private-hook-command", Sensitive: true, OutputSensitive: true,

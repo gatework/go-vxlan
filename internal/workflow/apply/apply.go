@@ -12,8 +12,8 @@ import (
 // Session is the capability the executor consumes. ReadConfiguration returns
 // complete, checked configuration evidence or an error.
 type Session interface {
-	ReadConfiguration(context.Context) (vxlan.Record, error)
-	Write(context.Context, string) error
+	ReadConfiguration(ctx context.Context) (vxlan.Record, error)
+	Write(ctx context.Context, command string) error
 }
 
 // Opener lends exactly one session and context for the complete operation. Its
@@ -25,10 +25,11 @@ type Opener func(context.Context, func(context.Context, Session) error) error
 // FinalizeExecution preserves an independent durable checkpoint and invalidates
 // unconfirmed success when the final publication or its recovery fails.
 type Journal interface {
-	WriteExecution(context.Context, vxlan.Record) error
-	FinalizeExecution(context.Context, vxlan.Record) error
+	WriteExecution(ctx context.Context, execution vxlan.Record) error
+	FinalizeExecution(ctx context.Context, execution vxlan.Record) error
 }
 
+// Result retains execution state and independent publication or cancellation outcomes.
 type Result struct {
 	State             vxlan.Record
 	ReportUnconfirmed bool
@@ -71,63 +72,7 @@ func Run(ctx context.Context, plan *change.ExecutionPlan, open Opener, journal J
 		return fail(err, false)
 	}
 	operation := func(operationCtx context.Context, session Session) error {
-		if operationCtx == nil || session == nil {
-			return change.ErrExecutionPlan
-		}
-		checkContext := func() error { return errors.Join(ctx.Err(), operationCtx.Err()) }
-		if err := checkContext(); err != nil {
-			return err
-		}
-		before, err := session.ReadConfiguration(operationCtx)
-		if err != nil {
-			return err
-		}
-		before, err = vxlan.ProjectRecord(before)
-		if err != nil {
-			return err
-		}
-		if err = plan.CheckBefore(before); err != nil {
-			return err
-		}
-		for i, command := range state.commands {
-			if err = checkContext(); err != nil {
-				return err
-			}
-			state.status, state.pendingCommand = executionRunning, new(i)
-			if err = journal.WriteExecution(operationCtx, state.record()); err != nil {
-				var publication interface{ PublicationCommitted() bool }
-				if errors.As(err, &publication) && publication.PublicationCommitted() {
-					state.started = true
-				}
-				return err
-			}
-			state.started = true
-			if err = checkContext(); err != nil {
-				return err
-			}
-			if err = session.Write(operationCtx, command); err != nil {
-				return err
-			}
-			state.acknowledged = append(state.acknowledged, i)
-			state.pendingCommand = nil
-			if err = journal.WriteExecution(context.WithoutCancel(operationCtx), state.record()); err != nil {
-				return err
-			}
-			if err = checkContext(); err != nil {
-				return err
-			}
-		}
-		after, err := session.ReadConfiguration(operationCtx)
-		if err != nil {
-			return err
-		}
-		digest, err := plan.CheckAfter(before, after)
-		if err != nil {
-			return err
-		}
-		state.observedConfigSHA256 = digest
-		state.verified = true
-		return checkContext()
+		return state.execute(ctx, operationCtx, session, journal)
 	}
 	if err := ownedOpen(ctx, open, operation); err != nil {
 		return fail(err, false)
@@ -180,4 +125,65 @@ func ownedOpen(ctx context.Context, open Opener, run func(context.Context, Sessi
 	mu.Lock()
 	defer mu.Unlock()
 	return errors.Join(openErr, callbackErr, protocolErr, ctx.Err())
+}
+
+func (s *executionState) execute(ctx, operationCtx context.Context, session Session, journal Journal) error {
+	plan := s.plan
+	if operationCtx == nil || session == nil {
+		return change.ErrExecutionPlan
+	}
+	checkContext := func() error { return errors.Join(ctx.Err(), operationCtx.Err()) }
+	if err := checkContext(); err != nil {
+		return err
+	}
+	before, err := session.ReadConfiguration(operationCtx)
+	if err != nil {
+		return err
+	}
+	before, err = vxlan.ProjectRecord(before)
+	if err != nil {
+		return err
+	}
+	if err = plan.CheckBefore(before); err != nil {
+		return err
+	}
+	for i, command := range s.commands {
+		if err = checkContext(); err != nil {
+			return err
+		}
+		s.status, s.pendingCommand = executionRunning, new(i)
+		if err = journal.WriteExecution(operationCtx, s.record()); err != nil {
+			var publication interface{ PublicationCommitted() bool }
+			if errors.As(err, &publication) && publication.PublicationCommitted() {
+				s.started = true
+			}
+			return err
+		}
+		s.started = true
+		if err = checkContext(); err != nil {
+			return err
+		}
+		if err = session.Write(operationCtx, command); err != nil {
+			return err
+		}
+		s.acknowledged = append(s.acknowledged, i)
+		s.pendingCommand = nil
+		if err = journal.WriteExecution(context.WithoutCancel(operationCtx), s.record()); err != nil {
+			return err
+		}
+		if err = checkContext(); err != nil {
+			return err
+		}
+	}
+	after, err := session.ReadConfiguration(operationCtx)
+	if err != nil {
+		return err
+	}
+	digest, err := plan.CheckAfter(before, after)
+	if err != nil {
+		return err
+	}
+	s.observedConfigSHA256 = digest
+	s.verified = true
+	return checkContext()
 }

@@ -25,7 +25,7 @@ type Settings struct {
 func (c *Config) freeze() {
 	c.runtime = runtimeSettings(c.Values)
 	if c.Policy != nil {
-		c.runtime.policy = record.Copy(c.Policy).(vxlan.Record)
+		c.runtime.policy = record.Clone(c.Policy)
 	}
 	c.runtime.Connection.Username = credential(c.Environment, "NC_CISCO_NXOS_USERNAME", "NC_DEVICE_USERNAME")
 	c.runtime.Connection.Password = credential(c.Environment, "NC_CISCO_NXOS_PASSWORD", "NC_DEVICE_PASSWORD")

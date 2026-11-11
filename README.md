@@ -2,10 +2,10 @@
 
 Cisco NX-OS VXLAN/EVPN 配置与运行态采集、证据解析、Fabric 审查和受控增量变更。参考 Ruby VXLAN `3c7b855` 实现，运行时不需要 Ruby。
 
-支持 Go 1.26 及以上，Linux/macOS amd64/arm64。当前版本 [v0.3.1](docs/releases/v0.3.1.md)，固定使用正式依赖 `go-net-connector v0.6.0` 与 `go-expect v0.5.0`，通过 `GOWORK=off` 独立构建。Fabric 审查的公开查询接口有所调整，升级前阅读 [API 迁移](docs/api-migration.md)；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
+支持 Go 1.26 及以上，Linux/macOS amd64/arm64。当前版本 [v0.4.0](docs/releases/v0.4.0.md)，固定使用正式依赖 `go-net-connector v0.7.1` 与 `go-expect v0.6.0`，通过 `GOWORK=off` 独立构建。Fabric 审查的公开查询接口有所调整，升级前阅读 [API 迁移](docs/api-migration.md)；版本与附件见 [Releases](https://github.com/gatework/go-vxlan/releases)。
 
 ```sh
-GOWORK=off go test -mod=readonly ./...
+GOWORK=off make check
 GOWORK=off go build -mod=readonly -o bin/vxlan ./cmd/vxlan
 ./bin/vxlan --help
 ```

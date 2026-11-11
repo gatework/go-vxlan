@@ -4,8 +4,9 @@ import (
 	"context"
 
 	"fmt"
-	"github.com/gatework/go-netops/assess"
 	"path/filepath"
+
+	"github.com/gatework/go-netops/assess"
 
 	"github.com/spf13/pflag"
 

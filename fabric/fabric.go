@@ -9,8 +9,9 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/gatework/go-netops/evidence"
 	"go.yaml.in/yaml/v3"
+
+	"github.com/gatework/go-netops/evidence"
 )
 
 // ErrPolicy reports an invalid fabric membership policy.

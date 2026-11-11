@@ -2,9 +2,10 @@ package vxlan_test
 
 import (
 	"fmt"
-	"github.com/gatework/go-vxlan/vendors"
 	"strings"
 	"testing"
+
+	"github.com/gatework/go-vxlan/vendors"
 
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/collect"

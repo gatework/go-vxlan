@@ -3,6 +3,7 @@ package report
 import (
 	"context"
 	"fmt"
+
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
 )

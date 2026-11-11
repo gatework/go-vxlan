@@ -1,9 +1,11 @@
 package record
 
 import (
+	"slices"
 	"sort"
 )
 
+// List views supported record and string slices as a list, or returns nil.
 func List(v any) []any {
 	if a, ok := v.([]Record); ok {
 		r := []any{}
@@ -25,6 +27,7 @@ func List(v any) []any {
 	return nil
 }
 
+// Texts selects the string elements of a supported list.
 func Texts(v any) []string {
 	r := []string{}
 	for _, x := range List(v) {
@@ -35,6 +38,7 @@ func Texts(v any) []string {
 	return r
 }
 
+// StringSlice reads a string array and panics on a violated internal type invariant.
 func StringSlice(v any) []string {
 	if v == nil {
 		return []string{}
@@ -43,12 +47,21 @@ func StringSlice(v any) []string {
 		return s
 	}
 	out := []string{}
-	for _, a := range v.([]any) {
-		out = append(out, a.(string))
+	values, ok := v.([]any)
+	if !ok {
+		panic("record: string array has an invalid type")
+	}
+	for _, a := range values {
+		value, ok := a.(string)
+		if !ok {
+			panic("record: string array contains a non-string")
+		}
+		out = append(out, value)
 	}
 	return out
 }
 
+// Rows reads record rows and panics if the container is not an array.
 func Rows(v any) []Record {
 	if v == nil {
 		return []Record{}
@@ -57,12 +70,17 @@ func Rows(v any) []Record {
 		return r
 	}
 	out := []Record{}
-	for _, x := range v.([]any) {
+	values, ok := v.([]any)
+	if !ok {
+		panic("record: row array has an invalid type")
+	}
+	for _, x := range values {
 		out = append(out, Map(x))
 	}
 	return out
 }
 
+// Keys returns lexically sorted map keys.
 func Keys(m Record) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
@@ -72,6 +90,7 @@ func Keys(m Record) []string {
 	return out
 }
 
+// NaturalKeys orders keys with numeric suffixes numerically within a shared prefix.
 func NaturalKeys(m Record) []string {
 	keys := Keys(m)
 	sort.SliceStable(keys, func(i, j int) bool {
@@ -91,6 +110,7 @@ func NaturalKeys(m Record) []string {
 	return keys
 }
 
+// UniqueSorted returns sorted distinct strings.
 func UniqueSorted(x []string) []string {
 	m := map[string]bool{}
 	for _, v := range x {
@@ -113,6 +133,7 @@ func Unique(rows []any) []any {
 	return out
 }
 
+// UniqueChecked deduplicates rows by canonical JSON and rejects unsupported evidence.
 func UniqueChecked(rows []any) ([]any, error) {
 	out := []any{}
 	seen := map[string]bool{}
@@ -130,16 +151,13 @@ func UniqueChecked(rows []any) ([]any, error) {
 	return out, nil
 }
 
+// Contains reports whether the list contains the value.
 func Contains(xs []string, v string) bool {
-	for _, x := range xs {
-		if x == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(xs, v)
 }
 
-func RecordSlice(v any) ([]Record, bool) {
+// Slice accepts only arrays containing records.
+func Slice(v any) ([]Record, bool) {
 	switch rows := v.(type) {
 	case []Record:
 		return rows, true
@@ -158,6 +176,7 @@ func RecordSlice(v any) ([]Record, bool) {
 	}
 }
 
+// Strings accepts only arrays containing strings.
 func Strings(v any) ([]string, bool) {
 	switch s := v.(type) {
 	case []string:

@@ -1,6 +1,7 @@
 package nxos
 
 import (
+	"maps"
 	"math/big"
 	"net/netip"
 	"strconv"
@@ -38,98 +39,15 @@ func (p *rtParser) bgp(text string) {
 		}
 		if m := rtFind(`^Neighbor\s+T\s+AS\s+(?:(PfxRcd)\s+)?(Type-[1-9]\d*(?:\s+Type-[1-9]\d*)*)$`, line); m != nil {
 			total = m[1] != ""
-			columns = []string{}
-			unique := map[string]bool{}
-			valid := true
-			for _, w := range rtWords(m[2]) {
-				c := strings.ReplaceAll(strings.ToLower(w), "-", "")
-				if unique[c] || !rtMatch(`^type(?:[1-8]|12)$`, c) {
-					valid = false
-				}
-				unique[c] = true
-				columns = append(columns, c)
-			}
-			if !valid {
-				p.unparsed(n)
-				columns = nil
-			}
+			columns = p.bgpColumns(m[2], n)
 			return
 		}
 		if columns != nil {
-			words := rtWords(line)
-			offset := 3
-			if total {
-				offset = 4
-			}
-			valid := len(words) == len(columns)+offset
-			var peer vxlan.Record
-			idx := -1
-			if len(words) > 0 {
-				if address, ok := rtIP(words[0]); ok {
-					keyScope := vxlan.Record{"vrf": scope["vrf"], "address_family": scope["address_family"], "peer_ip": address}
-					if i, exists := peers[rtKey(keyScope, []string{"vrf", "address_family", "peer_ip"})]; exists {
-						idx = i
-						peer = p.rows[i]
-					}
-				}
-			}
-			if valid {
-				valid = (words[1] == "I" || words[1] == "E")
-				for _, w := range words[2:] {
-					valid = valid && rtMatch(`^\d+$`, w)
-				}
-				valid = valid && peer != nil && peer["prefixes_received"] != nil && !seen[idx]
-				if valid {
-					valid = rtEqualNumber(peer["remote_as"], words[2]) && (!total || rtEqualNumber(peer["prefixes_received"], words[3]))
-				}
-			}
-			if valid {
-				sum := new(big.Int)
-				counts := vxlan.Record{}
-				for i, c := range columns {
-					v := rtNum(words[offset+i])
-					counts[c] = v
-					b, _ := new(big.Int).SetString(words[offset+i], 10)
-					sum.Add(sum, b)
-				}
-				max, _ := new(big.Int).SetString(rtNumberString(peer["prefixes_received"]), 10)
-				if sum.Cmp(max) > 0 {
-					p.issues = append(p.issues, vxlan.Record{"code": "inconsistent_prefix_statistics", "line": n})
-				} else {
-					peer["prefixes_by_type"] = counts
-				}
-				seen[idx] = true
-			} else {
-				p.unparsed(n)
-			}
+			p.bgpStatistics(line, n, scope, columns, total, peers, seen)
 			return
 		}
 		if m := rtFind(`(?i)^([\da-f:.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(.+)$`, line); m != nil {
-			r := rtFields("peer_ip version remote_as messages_received messages_sent table_version input_queue output_queue uptime state", m[1:])
-			for k, v := range scope {
-				r[k] = v
-			}
-			for _, k := range []string{"version", "remote_as", "messages_received", "messages_sent", "table_version", "input_queue", "output_queue"} {
-				r[k] = rtNum(r[k].(string))
-			}
-			asn, e := strconv.ParseUint(m[3], 10, 32)
-			if r["vrf"] == nil || r["address_family"] != "L2VPN EVPN" || !rtValidIP(m[1]) || !rtEqualNumber(r["version"], "4") || e != nil || asn == 0 || !rtMatch(`(?i)^(?:\d+|Idle(?: \(Admin\))?|Active|Connect|OpenSent|OpenConfirm|Shutdown)$`, m[10]) {
-				p.unparsed(n)
-				return
-			}
-			r["peer_ip"], _ = rtIP(m[1])
-			state := strings.ReplaceAll(strings.ToLower(m[10]), " ", "_")
-			r["state"] = state
-			r["prefixes_received"] = nil
-			if rtMatch(`^\d+$`, state) {
-				r["prefixes_received"] = rtNum(state)
-				r["state"] = "established"
-			}
-			p.rows = append(p.rows, r)
-			key := rtKey(r, []string{"vrf", "address_family", "peer_ip"})
-			if _, ok := peers[key]; !ok {
-				peers[key] = len(p.rows) - 1
-			}
+			p.bgpPeer(m, scope, peers, n)
 			return
 		}
 		if !rtMatch(`(?i)^(?:BGP table version is \d+(?:, L2VPN EVPN config peers \d+, capable peers \d+)?|\d+ network entries and \d+ paths using \d+ bytes of memory|BGP attribute entries \[\d+/\d+\], BGP AS path entries \[\d+/\d+\]|BGP community entries \[\d+/\d+\], BGP clusterlist entries \[\d+/\d+\])$`, line) {
@@ -174,7 +92,7 @@ func (p *rtParser) bgpIdentities(text string) {
 	invalid := map[string]vxlan.Record{}
 	order := []string{}
 	scopeKey := "null"
-	for _, s := range strings.Split(text, "\n") {
+	for s := range strings.SplitSeq(text, "\n") {
 		line := rtTrim(s)
 		if m := rtFind(rtBGPScope, line); m != nil {
 			scope = vxlan.Record{"vrf": m[1], "address_family": m[2]}
@@ -217,4 +135,103 @@ func (p *rtParser) bgpIdentities(text string) {
 		}
 	}
 	p.rows = out
+}
+
+func (p *rtParser) bgpStatistics(line string, n int, scope vxlan.Record, columns []string, total bool, peers map[string]int, seen map[int]bool) {
+	words := rtWords(line)
+	offset := 3
+	if total {
+		offset = 4
+	}
+	valid := len(words) == len(columns)+offset
+	peer, idx := p.bgpStatisticsPeer(words, scope, peers)
+	if valid {
+		valid = (words[1] == "I" || words[1] == "E")
+		for _, w := range words[2:] {
+			valid = valid && rtMatch(`^\d+$`, w)
+		}
+		valid = valid && peer != nil && peer["prefixes_received"] != nil && !seen[idx]
+		if valid {
+			valid = rtEqualNumber(peer["remote_as"], words[2]) && (!total || rtEqualNumber(peer["prefixes_received"], words[3]))
+		}
+	}
+	if valid {
+		sum := new(big.Int)
+		counts := vxlan.Record{}
+		for i, c := range columns {
+			v := rtNum(words[offset+i])
+			counts[c] = v
+			b, _ := new(big.Int).SetString(words[offset+i], 10)
+			sum.Add(sum, b)
+		}
+		maximum, _ := new(big.Int).SetString(rtNumberString(peer["prefixes_received"]), 10)
+		if sum.Cmp(maximum) > 0 {
+			p.issues = append(p.issues, vxlan.Record{"code": "inconsistent_prefix_statistics", "line": n})
+		} else {
+			peer["prefixes_by_type"] = counts
+		}
+		seen[idx] = true
+	} else {
+		p.unparsed(n)
+	}
+}
+
+func (p *rtParser) bgpStatisticsPeer(words []string, scope vxlan.Record, peers map[string]int) (vxlan.Record, int) {
+	var peer vxlan.Record
+	idx := -1
+	if len(words) > 0 {
+		if address, ok := rtIP(words[0]); ok {
+			keyScope := vxlan.Record{"vrf": scope["vrf"], "address_family": scope["address_family"], "peer_ip": address}
+			if i, exists := peers[rtKey(keyScope, []string{"vrf", "address_family", "peer_ip"})]; exists {
+				idx = i
+				peer = p.rows[i]
+			}
+		}
+	}
+	return peer, idx
+}
+
+func (p *rtParser) bgpColumns(text string, n int) []string {
+	columns := []string{}
+	unique := map[string]bool{}
+	valid := true
+	for _, w := range rtWords(text) {
+		c := strings.ReplaceAll(strings.ToLower(w), "-", "")
+		if unique[c] || !rtMatch(`^type(?:[1-8]|12)$`, c) {
+			valid = false
+		}
+		unique[c] = true
+		columns = append(columns, c)
+	}
+	if !valid {
+		p.unparsed(n)
+		columns = nil
+	}
+	return columns
+}
+
+func (p *rtParser) bgpPeer(m []string, scope vxlan.Record, peers map[string]int, n int) {
+	r := rtFields("peer_ip version remote_as messages_received messages_sent table_version input_queue output_queue uptime state", m[1:])
+	maps.Copy(r, scope)
+	for _, k := range []string{"version", "remote_as", "messages_received", "messages_sent", "table_version", "input_queue", "output_queue"} {
+		r[k] = rtNum(parsedValue[string](r[k]))
+	}
+	asn, e := strconv.ParseUint(m[3], 10, 32)
+	if r["vrf"] == nil || r["address_family"] != "L2VPN EVPN" || !rtValidIP(m[1]) || !rtEqualNumber(r["version"], "4") || e != nil || asn == 0 || !rtMatch(`(?i)^(?:\d+|Idle(?: \(Admin\))?|Active|Connect|OpenSent|OpenConfirm|Shutdown)$`, m[10]) {
+		p.unparsed(n)
+		return
+	}
+	r["peer_ip"], _ = rtIP(m[1])
+	state := strings.ReplaceAll(strings.ToLower(m[10]), " ", "_")
+	r["state"] = state
+	r["prefixes_received"] = nil
+	if rtMatch(`^\d+$`, state) {
+		r["prefixes_received"] = rtNum(state)
+		r["state"] = "established"
+	}
+	p.rows = append(p.rows, r)
+	key := rtKey(r, []string{"vrf", "address_family", "peer_ip"})
+	if _, ok := peers[key]; !ok {
+		peers[key] = len(p.rows) - 1
+	}
 }

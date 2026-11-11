@@ -14,6 +14,7 @@ import (
 	"github.com/gatework/go-vxlan/internal/record"
 )
 
+// ErrExecutionPlan rejects an invalid, stale or unbound execution plan.
 var ErrExecutionPlan = errors.New("vxlan: execution plan validation failed")
 
 var executionItemID = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
@@ -30,6 +31,7 @@ type ExecutionPlan struct {
 	commands, rollback                 []string
 }
 
+// NewExecutionPlan validates and binds one executable item to the plan document and target.
 func NewExecutionPlan(body []byte, itemID string) (*ExecutionPlan, error) {
 	if !executionItemID.MatchString(itemID) {
 		return nil, ErrExecutionPlan
@@ -72,27 +74,47 @@ func NewExecutionPlan(body []byte, itemID string) (*ExecutionPlan, error) {
 			return nil, ErrExecutionPlan
 		}
 	}
-	return &ExecutionPlan{itemID: itemID, planSHA256: fmt.Sprintf("%x", sha256.Sum256(body)), expectedSHA256: expected, device: record.Copy(device).(vxlan.Record), presentation: record.Copy(item).(vxlan.Record), change: change,
+	return &ExecutionPlan{itemID: itemID, planSHA256: fmt.Sprintf("%x", sha256.Sum256(body)), expectedSHA256: expected, device: record.Clone(device), presentation: record.Clone(item), change: change,
 		commands: script.Commands, rollback: script.Rollback}, nil
 }
 
-func (p *ExecutionPlan) Valid() bool                  { return p != nil && p.change != nil && p.planSHA256 != "" }
-func (p *ExecutionPlan) Host() string                 { return record.String(p.device["host"]) }
-func (p *ExecutionPlan) ItemID() string               { return p.itemID }
-func (p *ExecutionPlan) PlanSHA256() string           { return p.planSHA256 }
+// Valid reports whether the execution plan was fully bound and validated.
+func (p *ExecutionPlan) Valid() bool { return p != nil && p.change != nil && p.planSHA256 != "" }
+
+// Host returns the bound target host.
+func (p *ExecutionPlan) Host() string { return record.String(p.device["host"]) }
+
+// ItemID returns the selected plan item identity.
+func (p *ExecutionPlan) ItemID() string { return p.itemID }
+
+// PlanSHA256 returns the digest binding the complete plan document.
+func (p *ExecutionPlan) PlanSHA256() string { return p.planSHA256 }
+
+// ExpectedConfigSHA256 returns the required pre-execution configuration digest.
 func (p *ExecutionPlan) ExpectedConfigSHA256() string { return p.expectedSHA256 }
+
+// Device returns detached target device metadata.
 func (p *ExecutionPlan) Device() vxlan.Record {
-	return record.Copy(p.device).(vxlan.Record)
+	return record.Clone(p.device)
 }
+
+// Presentation returns a detached record of the selected plan item.
 func (p *ExecutionPlan) Presentation() vxlan.Record {
-	return record.Copy(p.presentation).(vxlan.Record)
+	return record.Clone(p.presentation)
 }
+
+// Commands returns a detached sequence of forward commands.
 func (p *ExecutionPlan) Commands() []string { return slices.Clone(p.commands) }
+
+// Rollback returns rollback guidance without executing it.
 func (p *ExecutionPlan) Rollback() []string { return slices.Clone(p.rollback) }
+
+// ConfirmationToken returns the target-specific interactive confirmation token.
 func (p *ExecutionPlan) ConfirmationToken() string {
 	return "APPLY " + p.Host() + " " + p.planSHA256[:12] + " " + p.itemID
 }
 
+// CheckBefore rejects stale configuration or unmet prerequisites before execution.
 func (p *ExecutionPlan) CheckBefore(config vxlan.Record) error {
 	if !p.Valid() {
 		return ErrExecutionPlan
@@ -131,6 +153,7 @@ func typedConfiguration(config vxlan.Record) (*fabric.Configuration, error) {
 	return fabric.DecodeConfiguration(body)
 }
 
+// CheckAfter verifies the requested change and preservation of unrelated configuration.
 func (p *ExecutionPlan) CheckAfter(before, after vxlan.Record) (string, error) {
 	if err := p.CheckBefore(before); err != nil {
 		return "", err

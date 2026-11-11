@@ -22,7 +22,7 @@ type baselineInput = assess.Input[*BaselineScope]
 // BaselineRules compare each fabric with its declared intent. Every finding
 // is a drift from the baseline, never from peers, so a fabric whose members
 // all agree on a wrong value is still reported.
-func BaselineRules() []baselineRule {
+func BaselineRules() []assess.Rule[*BaselineScope] {
 	return []baselineRule{baselineAnycastMAC, baselineSVIMTU, baselineFeatures, baselineNVE, baselineEVPNAuto,
 		baselineServices, baselineManagement, baselineVPC}
 }
@@ -261,83 +261,93 @@ func DeriveBaseline(m *fabric.Model) fabric.Baseline {
 		if !configured(f) {
 			continue
 		}
-		var e fabric.Expectation
-		vt := f.VTEPs()
-		majority := func(values []string) (string, bool) {
-			var ms []drift.Member[string]
-			for _, v := range values {
-				ms = append(ms, drift.Member[string]{Value: v, Present: v != ""})
-			}
-			v, ok, _ := drift.Consensus("", ms)
-			return v, ok
-		}
-		var macs, mtus, reach, source []string
-		services := map[int][]string{}
-		for _, d := range vt {
-			c := d.Configuration
-			macs = append(macs, c.AnycastMAC)
-			reach = append(reach, c.NVE.HostReachability)
-			source = append(source, canonicalLoopback(c.NVE.SourceInterface))
-			for _, s := range c.Services() {
-				if s.Gateway() && s.SVI.MTU != nil {
-					mtus = append(mtus, strconv.Itoa(*s.SVI.MTU))
-				}
-				if s.VLAN != nil {
-					services[s.VNI] = append(services[s.VNI], strconv.Itoa(*s.VLAN))
-				}
-			}
-		}
-		if v, ok := majority(macs); ok && v != "" {
-			e.AnycastGatewayMAC = &v
-		}
-		if v, ok := majority(mtus); ok && v != "" {
-			n, _ := strconv.Atoi(v)
-			e.SVIMTU = &n
-		}
-		nve := &fabric.NVEExpectation{}
-		if v, ok := majority(reach); ok && v != "" {
-			nve.HostReachability = &v
-		}
-		if v, ok := majority(source); ok && v != "" {
-			nve.SourceInterface = &v
-		}
-		if nve.HostReachability != nil || nve.SourceInterface != nil {
-			e.NVE = nve
-		}
-		e.Services = map[int]int{}
-		for vni, vlans := range services {
-			if v, ok := majority(vlans); ok && v != "" {
-				n, _ := strconv.Atoi(v)
-				e.Services[vni] = n
-			}
-		}
-		mgmt := &fabric.ManagementExpectation{}
-		for _, k := range serverKinds {
-			var sets []string
-			byKey := map[string][]string{}
-			for _, d := range f.Members {
-				addrs := fabric.Addresses(k.get(ops(d.Configuration)))
-				key := joinSorted(addrs)
-				byKey[key] = addrs
-				sets = append(sets, key)
-			}
-			if v, ok := majority(sets); ok && v != "" {
-				switch k.name {
-				case "ntp":
-					mgmt.NTP = byKey[v]
-				case "logging":
-					mgmt.Logging = byKey[v]
-				case "tacacs":
-					mgmt.TACACS = byKey[v]
-				case "snmp":
-					mgmt.SNMP = byKey[v]
-				}
-			}
-		}
-		if mgmt.NTP != nil || mgmt.Logging != nil || mgmt.TACACS != nil || mgmt.SNMP != nil {
-			e.Management = mgmt
-		}
+		e := deriveFabricBaseline(f)
 		b.Fabrics[f.Name] = e
 	}
 	return b
+}
+
+func deriveFabricBaseline(f *fabric.Fabric) fabric.Expectation {
+	var e fabric.Expectation
+	vt := f.VTEPs()
+	majority := func(values []string) (string, bool) {
+		var ms []drift.Member[string]
+		for _, v := range values {
+			ms = append(ms, drift.Member[string]{Value: v, Present: v != ""})
+		}
+		v, ok, _ := drift.Consensus("", ms)
+		return v, ok
+	}
+	var macs, mtus, reach, source []string
+	services := map[int][]string{}
+	for _, d := range vt {
+		c := d.Configuration
+		macs = append(macs, c.AnycastMAC)
+		reach = append(reach, c.NVE.HostReachability)
+		source = append(source, canonicalLoopback(c.NVE.SourceInterface))
+		for _, s := range c.Services() {
+			if s.Gateway() && s.SVI.MTU != nil {
+				mtus = append(mtus, strconv.Itoa(*s.SVI.MTU))
+			}
+			if s.VLAN != nil {
+				services[s.VNI] = append(services[s.VNI], strconv.Itoa(*s.VLAN))
+			}
+		}
+	}
+	if v, ok := majority(macs); ok && v != "" {
+		e.AnycastGatewayMAC = &v
+	}
+	if v, ok := majority(mtus); ok && v != "" {
+		n, _ := strconv.Atoi(v)
+		e.SVIMTU = &n
+	}
+	nve := &fabric.NVEExpectation{}
+	if v, ok := majority(reach); ok && v != "" {
+		nve.HostReachability = &v
+	}
+	if v, ok := majority(source); ok && v != "" {
+		nve.SourceInterface = &v
+	}
+	if nve.HostReachability != nil || nve.SourceInterface != nil {
+		e.NVE = nve
+	}
+	e.Services = map[int]int{}
+	for vni, vlans := range services {
+		if v, ok := majority(vlans); ok && v != "" {
+			n, _ := strconv.Atoi(v)
+			e.Services[vni] = n
+		}
+	}
+	mgmt := deriveManagementBaseline(f, majority)
+	if mgmt.NTP != nil || mgmt.Logging != nil || mgmt.TACACS != nil || mgmt.SNMP != nil {
+		e.Management = mgmt
+	}
+	return e
+}
+
+func deriveManagementBaseline(f *fabric.Fabric, majority func([]string) (string, bool)) *fabric.ManagementExpectation {
+	mgmt := &fabric.ManagementExpectation{}
+	for _, k := range serverKinds {
+		var sets []string
+		byKey := map[string][]string{}
+		for _, d := range f.Members {
+			addrs := fabric.Addresses(k.get(ops(d.Configuration)))
+			key := joinSorted(addrs)
+			byKey[key] = addrs
+			sets = append(sets, key)
+		}
+		if v, ok := majority(sets); ok && v != "" {
+			switch k.name {
+			case "ntp":
+				mgmt.NTP = byKey[v]
+			case "logging":
+				mgmt.Logging = byKey[v]
+			case "tacacs":
+				mgmt.TACACS = byKey[v]
+			case "snmp":
+				mgmt.SNMP = byKey[v]
+			}
+		}
+	}
+	return mgmt
 }

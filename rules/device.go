@@ -33,7 +33,7 @@ var notUp = []string{"down", "idle", "active", "connect", "opensent", "openconfi
 func isNotUp(state string) bool { return slices.Contains(notUp, strings.ToLower(state)) }
 
 // DeviceRules returns the per-device rules in evaluation order.
-func DeviceRules() []deviceRule {
+func DeviceRules() []assess.Rule[*fabric.Device] {
 	return append([]deviceRule{
 		evidenceIncomplete, configRelation, aclUndefined, nveShutdown,
 		nveVNIDown, nvePeerDown, bgpSessionDown, bgpNoPrefixes, ospfNotFull,

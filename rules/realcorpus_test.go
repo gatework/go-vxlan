@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -75,17 +74,6 @@ func realFabrics(t *testing.T) map[string]*realFabric {
 	if len(out) == 0 {
 		t.Skip("no SITE-ROLE##-ADDRESS.txt files in corpus")
 	}
-	return out
-}
-
-func diff(a, b map[string]bool) []string {
-	var out []string
-	for k := range a {
-		if !b[k] {
-			out = append(out, k)
-		}
-	}
-	slices.Sort(out)
 	return out
 }
 

@@ -5,9 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/report"
-	"go.yaml.in/yaml/v3"
 )
 
 // InitializedFile identifies a created template or an existing file preserved in place.

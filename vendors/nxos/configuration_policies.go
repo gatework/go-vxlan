@@ -57,14 +57,14 @@ func (s *cfgState) prefixList(b *cfgBlock, d vxlan.Record) {
 		parts := strings.Split(prefix, "/")
 		length, _ := strconv.Atoi(parts[1])
 		var ge, le any
-		min := length
+		minimum := length
 		if m[6] != "" {
 			n := cfgInt(m[6], length, width)
 			ge = n
-			min = n
+			minimum = n
 		}
 		if m[7] != "" {
-			le = cfgInt(m[7], min, width)
+			le = cfgInt(m[7], minimum, width)
 		}
 		return vxlan.Record{"sequence": seq, "action": m[4], "prefix": prefix, "ge": ge, "le": le}
 	})

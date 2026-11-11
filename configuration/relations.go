@@ -13,6 +13,8 @@ import (
 func Review(d vxlan.Record, complete bool) []vxlan.Record {
 	return ReviewOrdered(d, complete, record.Keys(record.Map(d["vrfs"])))
 }
+
+// ReviewOrdered retains the supplied VRF order while checking complete configuration relations.
 func ReviewOrdered(d vxlan.Record, complete bool, vrfOrder []string) []vxlan.Record {
 	out := []vxlan.Record{}
 	if !complete {
@@ -68,6 +70,19 @@ func ReviewOrdered(d vxlan.Record, complete bool, vrfOrder []string) []vxlan.Rec
 			out = append(out, vxlan.Record{"code": "vni_layer_conflict", "vni": n, "evpn_type": v["type"]})
 		}
 	}
+	out = append(out, reviewVRFRelations(vrfs, members, vrfOrder)...)
+	sort.SliceStable(out, func(i, j int) bool {
+		a, b := record.Number(out[i]["vni"]), record.Number(out[j]["vni"])
+		if a != b {
+			return a < b
+		}
+		return fmt.Sprint(out[i]["code"]) < fmt.Sprint(out[j]["code"])
+	})
+	return out
+}
+
+func reviewVRFRelations(vrfs, members vxlan.Record, vrfOrder []string) []vxlan.Record {
+	out := []vxlan.Record{}
 	for _, name := range vrfOrder {
 		value := vrfs[name]
 		v := record.Map(value)
@@ -85,12 +100,5 @@ func ReviewOrdered(d vxlan.Record, complete bool, vrfOrder []string) []vxlan.Rec
 			out = append(out, vxlan.Record{"code": code, "vni": v["vni"], "vrf": name})
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := record.Number(out[i]["vni"]), record.Number(out[j]["vni"])
-		if a != b {
-			return a < b
-		}
-		return fmt.Sprint(out[i]["code"]) < fmt.Sprint(out[j]["code"])
-	})
 	return out
 }

@@ -21,33 +21,7 @@ func (p *rtParser) routes(text string) {
 			continue
 		}
 		if rtMatch(`(?i)^Topology\b`, line) {
-			header := strings.Join(rtWords(line), " ")
-			matches := rtRE(rtRouteHeader).FindAllString(header, -1)
-			fields = []string{}
-			seen := map[string]bool{}
-			valid := true
-			required := map[string]bool{"topology_id": true, "mac": true, "producer": true, "next_hops": true}
-			if p.name == "l2route_mac_ips" {
-				required["host_ip"] = true
-			}
-			for _, label := range matches {
-				key := labels[strings.ToLower(label)]
-				fields = append(fields, key)
-				if seen[key] || (!required[key] && key != "flags" && key != "sequence") {
-					valid = false
-				}
-				seen[key] = true
-			}
-			for key := range required {
-				if !seen[key] {
-					valid = false
-				}
-			}
-			valid = valid && rtTrim(rtRE(rtRouteHeader).ReplaceAllString(header, "")) == "" && len(fields) >= 2 && fields[0] == "topology_id" && fields[1] == "mac" && fields[len(fields)-1] == "next_hops"
-			if !valid {
-				fields = nil
-				p.issues = append(p.issues, vxlan.Record{"code": "unknown_header", "line": n})
-			}
+			fields = p.routeHeaderFields(line, n, labels)
 			previous = nil
 			continue
 		}
@@ -63,40 +37,15 @@ func (p *rtParser) routes(text string) {
 		}
 		valid := false
 		if fields != nil && rtMatch(`^\d+\s`, line) {
-			values := rtRE(`\s+`).Split(line, len(fields))
-			if len(values) == len(fields) {
-				row := vxlan.Record{}
-				for i, k := range fields {
-					row[k] = values[i]
-				}
-				if route, ok := p.routeFields(row); ok {
-					previous = route
-					hopIndex = nil
-					p.rows = append(p.rows, route)
-					valid = true
-				}
+			if route, ok := p.routeLine(fields, line); ok {
+				previous = route
+				hopIndex = nil
+				p.rows = append(p.rows, route)
+				valid = true
 			}
 		} else if previous != nil && len(source) > 0 && (source[0] == ' ' || source[0] == '\t') {
 			if hops, ok := rtNextHops(line); ok {
-				if hopIndex == nil {
-					hopIndex = map[string]bool{}
-					unique := []vxlan.Record{}
-					for _, hop := range previous["next_hops"].([]vxlan.Record) {
-						key := rtHopKey(hop)
-						if !hopIndex[key] {
-							unique = append(unique, hop)
-							hopIndex[key] = true
-						}
-					}
-					previous["next_hops"] = unique
-				}
-				for _, hop := range hops {
-					key := rtHopKey(hop)
-					if !hopIndex[key] {
-						previous["next_hops"] = append(previous["next_hops"].([]vxlan.Record), hop)
-						hopIndex[key] = true
-					}
-				}
+				hopIndex = rtAppendRouteHops(previous, hops, hopIndex)
 				valid = true
 			}
 		}
@@ -110,31 +59,31 @@ func rtHopKey(r vxlan.Record) string {
 	return rtKey(r, []string{"address", "interface", "local", "ifindex", "label"})
 }
 func (p *rtParser) routeFields(r vxlan.Record) (vxlan.Record, bool) {
-	n, ok := rtUint32(r["topology_id"].(string))
+	n, ok := rtUint32(parsedValue[string](r["topology_id"]))
 	if !ok {
 		return nil, false
 	}
 	r["topology_id"] = n
-	mac := r["mac"].(string)
+	mac := parsedValue[string](r["mac"])
 	if !rtMatch(`(?i)^(?:[0-9a-f]{4}(?:\.[0-9a-f]{4}){2}|(?:[0-9a-f]{2}:){5}[0-9a-f]{2})$`, mac) {
 		return nil, false
 	}
 	r["mac"] = rtMAC(mac)
 	if s, exists := r["sequence"]; exists {
-		n, ok := rtUint32(s.(string))
+		n, ok := rtUint32(parsedValue[string](s))
 		if !ok {
 			return nil, false
 		}
 		r["sequence"] = n
 	}
 	if p.name == "l2route_mac_ips" {
-		ip, ok := rtIP(r["host_ip"].(string))
+		ip, ok := rtIP(parsedValue[string](r["host_ip"]))
 		if !ok {
 			return nil, false
 		}
 		r["host_ip"] = ip
 	}
-	hops, ok := rtNextHops(r["next_hops"].(string))
+	hops, ok := rtNextHops(parsedValue[string](r["next_hops"]))
 	if !ok {
 		return nil, false
 	}
@@ -214,4 +163,70 @@ func (p *rtParser) finishRoutes(complete bool) {
 	if !complete {
 		p.issue("output_incomplete")
 	}
+}
+
+func (p *rtParser) routeHeaderFields(line string, n int, labels map[string]string) []string {
+	header := strings.Join(rtWords(line), " ")
+	matches := rtRE(rtRouteHeader).FindAllString(header, -1)
+	fields := []string{}
+	seen := map[string]bool{}
+	valid := true
+	required := map[string]bool{"topology_id": true, "mac": true, "producer": true, "next_hops": true}
+	if p.name == "l2route_mac_ips" {
+		required["host_ip"] = true
+	}
+	for _, label := range matches {
+		key := labels[strings.ToLower(label)]
+		fields = append(fields, key)
+		if seen[key] || (!required[key] && key != "flags" && key != "sequence") {
+			valid = false
+		}
+		seen[key] = true
+	}
+	for key := range required {
+		if !seen[key] {
+			valid = false
+		}
+	}
+	valid = valid && rtTrim(rtRE(rtRouteHeader).ReplaceAllString(header, "")) == "" && len(fields) >= 2 && fields[0] == "topology_id" && fields[1] == "mac" && fields[len(fields)-1] == "next_hops"
+	if !valid {
+		fields = nil
+		p.issues = append(p.issues, vxlan.Record{"code": "unknown_header", "line": n})
+	}
+	return fields
+}
+
+func rtAppendRouteHops(previous vxlan.Record, hops []vxlan.Record, hopIndex map[string]bool) map[string]bool {
+	if hopIndex == nil {
+		hopIndex = map[string]bool{}
+		unique := []vxlan.Record{}
+		for _, hop := range parsedValue[[]vxlan.Record](previous["next_hops"]) {
+			key := rtHopKey(hop)
+			if !hopIndex[key] {
+				unique = append(unique, hop)
+				hopIndex[key] = true
+			}
+		}
+		previous["next_hops"] = unique
+	}
+	for _, hop := range hops {
+		key := rtHopKey(hop)
+		if !hopIndex[key] {
+			previous["next_hops"] = append(parsedValue[[]vxlan.Record](previous["next_hops"]), hop)
+			hopIndex[key] = true
+		}
+	}
+	return hopIndex
+}
+
+func (p *rtParser) routeLine(fields []string, line string) (vxlan.Record, bool) {
+	values := rtRE(`\s+`).Split(line, len(fields))
+	if len(values) != len(fields) {
+		return nil, false
+	}
+	row := vxlan.Record{}
+	for i, key := range fields {
+		row[key] = values[i]
+	}
+	return p.routeFields(row)
 }

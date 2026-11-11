@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 	"net/netip"
 	"os"
@@ -10,13 +11,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gatework/go-netops/assess"
+	"github.com/gatework/go-vxlan/fabric"
+
 	ncconfig "github.com/gatework/go-net-connector/config"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
+// ConfigOptions supplies configuration search locations, environment and overrides.
 type ConfigOptions struct {
 	CWD, Home, Program, ConfigFile, EnvFile string
 	Directories                             []string
@@ -25,6 +29,10 @@ type ConfigOptions struct {
 	AllowMissing                            bool
 	EnvironmentOnly                         bool
 }
+
+// Config owns resolved configuration, provenance and runtime bindings.
+//
+//nolint:recvcheck // Value formatting must redact both values and pointers; runtime binding methods mutate the configuration.
 type Config struct {
 	runtime             Settings
 	Values              vxlan.Record
@@ -36,9 +44,12 @@ type Config struct {
 	Inventory           vxlan.Record
 }
 
-func (c Config) String() string   { return "bootstrap.Config" }
+func (c Config) String() string { return "bootstrap.Config" }
+
+// GoString returns a redacted diagnostic representation.
 func (c Config) GoString() string { return c.String() }
 
+// Absolute resolves an operator path against its source directory and home.
 func Absolute(p, base, home string) string {
 	if p == "~" {
 		return home
@@ -51,6 +62,31 @@ func Absolute(p, base, home string) string {
 	}
 	return filepath.Join(base, p)
 }
+
+// ReadRulesPolicy reads an assessment rule policy: rule switches,
+// severity overrides and thresholds, validated later against the catalog.
+func ReadRulesPolicy(ctx context.Context, path string) (assess.Policy, error) {
+	b, _, e := ncconfig.ReadFile(ctx, path, false)
+	if e != nil {
+		return assess.Policy{}, e
+	}
+	return assess.DecodePolicy(b)
+}
+
+// ReadBaseline reads a frozen fabric baseline.
+func ReadBaseline(ctx context.Context, path string) (*fabric.Baseline, error) {
+	b, _, e := ncconfig.ReadFile(ctx, path, false)
+	if e != nil {
+		return nil, e
+	}
+	baseline, e := fabric.DecodeBaseline(b)
+	if e != nil {
+		return nil, e
+	}
+	return &baseline, nil
+}
+
+// ReadYAML reads a configuration mapping with cancellation checks.
 func ReadYAML(ctx context.Context, path string) (vxlan.Record, error) {
 	b, _, e := ncconfig.ReadFile(ctx, path, false)
 	if e != nil {
@@ -111,11 +147,34 @@ func envValues(env map[string]string) vxlan.Record {
 	}
 	return m
 }
+
+// Load resolves configuration and credentials through the documented layer order.
 func Load(ctx context.Context, o ConfigOptions) (Config, error) {
-	c := Config{Environment: map[string]string{}, Sources: vxlan.Record{}}
+	l := &configLoader{o: o, c: Config{Environment: map[string]string{}, Sources: vxlan.Record{}}}
 	if err := ctx.Err(); err != nil {
-		return c, err
+		return l.c, err
 	}
+	l.paths()
+	for _, phase := range []func(context.Context) error{l.environment, l.configuration, l.finish} {
+		if err := phase(ctx); err != nil {
+			return l.c, err
+		}
+	}
+	return l.c, nil
+}
+
+type configLoader struct {
+	o                     ConfigOptions
+	c                     Config
+	process, fileenv      map[string]string
+	user                  string
+	dirs, envFiles, files []string
+	data, specific        vxlan.Record
+	fields                map[string]string
+}
+
+func (l *configLoader) paths() {
+	o := l.o
 	if o.CWD == "" {
 		o.CWD, _ = os.Getwd()
 	}
@@ -133,9 +192,7 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 			process[p[0]] = p[1]
 		}
 	} else {
-		for k, v := range o.Environment {
-			process[k] = v
-		}
+		maps.Copy(process, o.Environment)
 	}
 	user := filepath.Join(o.Home, ".config", "net-connector")
 	if x := process["XDG_CONFIG_HOME"]; x != "" {
@@ -155,45 +212,51 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 		}
 	}
 	dirs = unique
-	fileenv := map[string]string{}
-	envFiles := []string{}
-	loadEnv := func(p string, explicit bool) error {
-		body, found, e := ncconfig.ReadFile(ctx, p, !explicit || o.AllowMissing)
-		if e != nil || !found {
-			return e
-		}
-		m, e := ncconfig.ParseEnvironment(string(body), fileenv, process)
-		if e != nil {
-			return e
-		}
-		for k, v := range m {
-			if k == "VXLAN_DIRECTORY" || k == "NC_KNOWN_HOSTS" || k == "ND_CACHE_DIRECTORY" || k == "VXLAN_CONFIG" || (k == "ND_DB_SSLROOTCERT" && v != "system") {
-				if strings.TrimSpace(v) != "" {
-					v = Absolute(v, filepath.Dir(p), o.Home)
-				}
-			}
-			fileenv[k] = v
-		}
-		envFiles = append(envFiles, p)
-		return nil
-	}
+	l.o, l.process, l.user, l.dirs = o, process, user, dirs
+}
+func (l *configLoader) environment(ctx context.Context) error {
+	o, c, dirs, process := l.o, &l.c, l.dirs, l.process
+	l.fileenv, l.envFiles = map[string]string{}, []string{}
 	for _, d := range dirs {
-		if e := loadEnv(filepath.Join(d, ".env"), false); e != nil {
-			return c, e
+		if e := l.loadEnvironmentFile(ctx, filepath.Join(d, ".env"), false); e != nil {
+			return e
 		}
 	}
 	if o.EnvFile != "" {
 		o.EnvFile = Absolute(o.EnvFile, o.CWD, o.Home)
-		if e := loadEnv(o.EnvFile, true); e != nil {
-			return c, e
+		if e := l.loadEnvironmentFile(ctx, o.EnvFile, true); e != nil {
+			return e
 		}
 	}
-	for k, v := range fileenv {
-		c.Environment[k] = v
+	maps.Copy(c.Environment, l.fileenv)
+	maps.Copy(c.Environment, process)
+	l.o = o
+	return nil
+}
+func (l *configLoader) loadEnvironmentFile(ctx context.Context, p string, explicit bool) error {
+	o, fileenv, process := l.o, l.fileenv, l.process
+	body, found, e := ncconfig.ReadFile(ctx, p, !explicit || o.AllowMissing)
+	if e != nil || !found {
+		return e
 	}
-	for k, v := range process {
-		c.Environment[k] = v
+	m, e := ncconfig.ParseEnvironment(string(body), fileenv, process)
+	if e != nil {
+		return e
 	}
+	for k, v := range m {
+		if k == "VXLAN_DIRECTORY" || k == "NC_KNOWN_HOSTS" || k == "ND_CACHE_DIRECTORY" || k == "VXLAN_CONFIG" || (k == "ND_DB_SSLROOTCERT" && v != "system") {
+			if strings.TrimSpace(v) != "" {
+				v = Absolute(v, filepath.Dir(p), o.Home)
+			}
+		}
+		fileenv[k] = v
+	}
+	l.envFiles = append(l.envFiles, p)
+	return nil
+}
+
+func (l *configLoader) configuration(ctx context.Context) error {
+	o, c, process, fileenv, user, dirs := l.o, &l.c, l.process, l.fileenv, l.user, l.dirs
 	explicit := o.ConfigFile
 	if explicit == "" {
 		explicit = strings.TrimSpace(process["VXLAN_CONFIG"])
@@ -212,61 +275,9 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 	if c.EnvPath == "" {
 		c.EnvPath = filepath.Join(user, ".env")
 	}
-	data, specific := vxlan.Record{}, vxlan.Record{}
-	files := []string{}
-	fields := map[string]string{}
-	load := func(p string, required bool) error {
-		body, found, e := ncconfig.ReadFile(ctx, p, !required || o.AllowMissing)
-		if e != nil || !found {
-			return e
-		}
-		m, e := ncconfig.ParseYAMLMapping(body)
-		if e != nil {
-			return e
-		}
-		files = append(files, p)
-		native := filepath.Base(p) != "net-connector.yml"
-		part := m
-		if _, ok := m["common"]; ok || m["vxlan"] != nil {
-			for k := range m {
-				if !record.Contains([]string{"common", "vxlan", "wireless", "backup", "topology"}, k) {
-					return fmt.Errorf("共享 YAML 包含未知分区")
-				}
-			}
-			for _, key := range []string{"common", "vxlan"} {
-				if v, ok := m[key]; ok {
-					if _, ok := v.(map[string]any); !ok {
-						return fmt.Errorf("共享分区须为映射")
-					}
-				}
-			}
-			common := record.Map(m["common"])
-			for k := range common {
-				if !record.Contains([]string{"netdisco", "inventory", "ssh"}, k) {
-					return fmt.Errorf("common 包含未知字段")
-				}
-			}
-			part = record.MergeLayers(common, record.Map(m["vxlan"]))
-			specific = record.MergeLayers(specific, record.Map(m["vxlan"]))
-		} else if !native {
-			part = vxlan.Record{}
-			for _, k := range []string{"netdisco", "inventory", "ssh"} {
-				if v, ok := m[k]; ok {
-					part[k] = v
-				}
-			}
-		} else {
-			specific = record.MergeLayers(specific, m)
-		}
-		resolve(part, filepath.Dir(p), o.Home, "", fields)
-		for k := range fields {
-			if fields[k] == filepath.Dir(p) {
-				fields[k] = p
-			}
-		}
-		data = record.MergeLayers(data, part)
-		return nil
-	}
+	l.data, l.specific = vxlan.Record{}, vxlan.Record{}
+	l.files = []string{}
+	l.fields = map[string]string{}
 	if !o.EnvironmentOnly {
 		for _, d := range dirs {
 			for _, name := range []string{"net-connector.yml", "vxlan.yml"} {
@@ -274,17 +285,61 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 				if p == explicit {
 					continue
 				}
-				if e := load(p, false); e != nil {
-					return c, e
+				if e := l.loadConfigurationFile(ctx, p, false); e != nil {
+					return e
 				}
 			}
 		}
 		if explicit != "" {
-			if e := load(explicit, true); e != nil {
-				return c, e
+			if e := l.loadConfigurationFile(ctx, explicit, true); e != nil {
+				return e
 			}
 		}
 	}
+	return nil
+}
+func (l *configLoader) loadConfigurationFile(ctx context.Context, p string, required bool) error {
+	o, fields := l.o, l.fields
+	body, found, e := ncconfig.ReadFile(ctx, p, !required || o.AllowMissing)
+	if e != nil || !found {
+		return e
+	}
+	m, e := ncconfig.ParseYAMLMapping(body)
+	if e != nil {
+		return e
+	}
+	l.files = append(l.files, p)
+	native := filepath.Base(p) != "net-connector.yml"
+	part := m
+	if _, ok := m["common"]; ok || m["vxlan"] != nil {
+		common, err := sharedConfiguration(m)
+		if err != nil {
+			return err
+		}
+		part = record.MergeLayers(common, record.Map(m["vxlan"]))
+		l.specific = record.MergeLayers(l.specific, record.Map(m["vxlan"]))
+	} else if !native {
+		part = vxlan.Record{}
+		for _, k := range []string{"netdisco", "inventory", "ssh"} {
+			if v, ok := m[k]; ok {
+				part[k] = v
+			}
+		}
+	} else {
+		l.specific = record.MergeLayers(l.specific, m)
+	}
+	resolve(part, filepath.Dir(p), o.Home, "", fields)
+	for k := range fields {
+		if fields[k] == filepath.Dir(p) {
+			fields[k] = p
+		}
+	}
+	l.data = record.MergeLayers(l.data, part)
+	return nil
+}
+
+func (l *configLoader) finish(ctx context.Context) error {
+	o, c, data, specific, files, fields, fileenv, process, envFiles := l.o, &l.c, l.data, l.specific, l.files, l.fields, l.fileenv, l.process, l.envFiles
 	c.Missing = len(files) == 0
 	if len(record.List(specific["devices"])) > 0 && specific["netdisco"] == nil && specific["inventory"] == nil && specific["netdisco_config"] == nil {
 		delete(data, "netdisco")
@@ -302,29 +357,29 @@ func Load(ctx context.Context, o ConfigOptions) (Config, error) {
 	c.Values = record.MergeLayers(defaults, envValues(fileenv), data, pv, overrides)
 	c.Sources = vxlan.Record{"configuration_files": files, "environment_files": envFiles, "fields": fields}
 	if e := validateConfig(c.Values); e != nil {
-		return c, e
+		return e
 	}
 	if p := record.String(c.Values["fabric_policy"]); p != "" {
 		m, e := ReadYAML(ctx, p)
 		if e != nil {
-			return c, e
+			return e
 		}
-		if e = review.ValidateFabricPolicy(m); e != nil {
-			return c, e
+		if e = fabric.ValidatePolicyDocument(m); e != nil {
+			return e
 		}
 		c.Policy = m
 	}
-	if e := prepareInventory(ctx, &c, fileenv, process, o.CWD, o.Home); e != nil {
-		return c, e
+	if e := prepareInventory(ctx, c, fileenv, process, o.CWD, o.Home); e != nil {
+		return e
 	}
 	if err := ctx.Err(); err != nil {
-		return c, err
+		return err
 	}
 	c.freeze()
 	if err := ctx.Err(); err != nil {
-		return c, err
+		return err
 	}
-	return c, nil
+	return nil
 }
 
 func normalizeDevices(v any) ([]any, error) {
@@ -413,6 +468,23 @@ func validateConfig(m vxlan.Record) error {
 	if v, ok := m["netdisco_config"]; ok && (record.String(v) == "" || len(rows) > 0) {
 		return fmt.Errorf("外部清单配置无效")
 	}
+	if err := validateFilters(m); err != nil {
+		return err
+	}
+	return validateSSH(m)
+}
+func addressPrefix(s string) (netip.Prefix, error) {
+	if strings.Contains(s, "/") {
+		return netip.ParsePrefix(s)
+	}
+	a, e := netip.ParseAddr(s)
+	if e != nil {
+		return netip.Prefix{}, e
+	}
+	return netip.PrefixFrom(a, a.BitLen()), nil
+}
+
+func validateFilters(m vxlan.Record) error {
 	for _, k := range []string{"hosts", "exclude_hosts", "names", "exclude_names"} {
 		v, ok := m[k]
 		if !ok {
@@ -435,6 +507,10 @@ func validateConfig(m vxlan.Record) error {
 			}
 		}
 	}
+	return nil
+}
+
+func validateSSH(m vxlan.Record) error {
 	ssh, ok := m["ssh"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("ssh 须为映射")
@@ -464,13 +540,25 @@ func validateConfig(m vxlan.Record) error {
 	}
 	return nil
 }
-func addressPrefix(s string) (netip.Prefix, error) {
-	if strings.Contains(s, "/") {
-		return netip.ParsePrefix(s)
+
+func sharedConfiguration(m vxlan.Record) (vxlan.Record, error) {
+	for k := range m {
+		if !record.Contains([]string{"common", "vxlan", "wireless", "backup", "topology"}, k) {
+			return nil, fmt.Errorf("共享 YAML 包含未知分区")
+		}
 	}
-	a, e := netip.ParseAddr(s)
-	if e != nil {
-		return netip.Prefix{}, e
+	for _, key := range []string{"common", "vxlan"} {
+		if v, ok := m[key]; ok {
+			if _, ok := v.(map[string]any); !ok {
+				return nil, fmt.Errorf("共享分区须为映射")
+			}
+		}
 	}
-	return netip.PrefixFrom(a, a.BitLen()), nil
+	common := record.Map(m["common"])
+	for k := range common {
+		if !record.Contains([]string{"netdisco", "inventory", "ssh"}, k) {
+			return nil, fmt.Errorf("common 包含未知字段")
+		}
+	}
+	return common, nil
 }

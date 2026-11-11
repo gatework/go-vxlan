@@ -15,6 +15,7 @@ import (
 	"github.com/gatework/go-vxlan/collect"
 )
 
+// Session borrows one connector operation for synchronous capture.
 type Session struct {
 	Operation *connector.Operation
 	Device    *connector.Device
@@ -87,6 +88,8 @@ func (s Session) Write(ctx context.Context, command string) error {
 	}
 	return nil
 }
+
+// Connected reports whether the borrowed connector operation remains connected.
 func (s Session) Connected() bool { return s.Operation != nil && s.Operation.Connected() }
 
 type sessionError struct{ error }
@@ -115,6 +118,8 @@ func interruptionCode(err error) string {
 // Connector errors already classify their causes; only unclassified wrappers
 // and joins are traversed. Unknown secondary failures must not be guessed to
 // be cleanup errors from private upstream types or diagnostic text.
+//
+//nolint:errorlint // Each error-tree node is classified independently before traversal.
 func (e sessionError) FailureCodes() []string {
 	var codes []string
 	var visit func(error)
@@ -178,7 +183,7 @@ func Open(config connector.ConnectionConfig) collect.OpenSession {
 		if e != nil {
 			return e
 		}
-		device, e := connector.New(platform.Profile(), config)
+		device, e := connector.New(platform, config)
 		if e != nil {
 			return e
 		}

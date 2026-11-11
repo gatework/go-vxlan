@@ -1,3 +1,4 @@
+// Command vxlan collects, reviews and applies explicitly confirmed device changes.
 package main
 
 import (

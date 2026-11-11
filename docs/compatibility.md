@@ -10,17 +10,17 @@
 | RuntimeParser / NXOS profile | `nxos.ParseRuntime`、`Profile.Queries`、`parser.Registry` | 11 类、727 条金样；5816 次独立运行态变体差分；型号覆盖、注册表独立复制 |
 | BGPNeighbors / PrefixListReferences / AclPolicy | `BGPNeighbors`、`PrefixListReferences`、`ACLRules`、`ResolveACLPolicy`、`ACLBindings` | 继承、引用、规则与依赖事实 |
 | Service / SubnetIndex | `ServiceCatalog`、`EffectiveNVEMember`、`ServiceRouteTargets`、`ServiceTenant`、`InferServiceMapping`、`NewSubnetIndex` | 映射歧义、租户、路由目标、前缀重叠；增长测试 |
-| Fabric scope/review | `ValidateFabricPolicy`、`ReviewFabric` | 明确部署范围、缺失事实、角色阻断、业务/ACL/网关/传输诊断 |
+| Fabric scope/review | `fabric.ValidatePolicyDocument`、`rules` 规则目录 | 明确部署范围、缺失事实、角色阻断、业务/ACL/网关/传输诊断；`rules/parity_test.go` 回放全部 fabric/recommendations 金样 |
 | Recommendations | `Recommendations`、`CombineRecommendations` | 分类、阻断、候选条件及修复关联 |
-| ChangePlan | `NewChangePlan`、`CandidateChangePlan`；`Eligible`、`Satisfied` | 三种动作、命令/条件回退、漂移和读回条件；领域合计 311 金样 |
+| ChangePlan | `change.DecodeChange`；`Eligible`、`Satisfied`、`Preserved` | 三种动作、命令/条件回退、漂移和读回条件；build/eligible/satisfied 金样与 `testdata/typed/change-oracle.json` 冻结判定 |
 | Collector | `collect.Collect`、`collect.CollectSession`、`netconnector.Open` | 配置优先；明确传输回执；准备命令；空表证据；独立失败；关闭失败；不重连重放 |
 | collect | `cmd/vxlan` / `internal/cli` | 静态/动态清单、过滤、预览、并发、取消、逐设备发布、摘要；本地 HTTP 测试 |
 | parse | `vxlan parse` | file/stdin、维度、model、complete、JSON；非法维度先拒绝；中断 stdin |
-| review | `vxlan review` | 离线 evidence 输入、Fabric policy、可选 scripts、schema 2 聚合计划、schema 3 review 摘要、事件 |
+| review | `vxlan review` | 离线 evidence 输入、Fabric policy、可选 scripts、schema 3 聚合计划与类型化 assessment 摘要、事件 |
 | apply | `vxlan apply` | checksum、单项、真实终端、确认、重新渲染、漂移、顺序写入、写前日志、读回、结果不明；假会话与真实 PTY 取消测试 |
 | 配置 / Report | `internal/bootstrap.Load` / `report.Report` | 分层、来源路径、严格 YAML、私有权限、原子替换/持久化失败、未完成检查点与恢复 |
 
-公共能力已按 [架构说明](architecture.md) 分包；完整路径映射见 [API 迁移](api-migration.md)。CLI wire schema 保持，Go 根包只保留证据与结构验证。
+公共能力已按 [架构说明](architecture.md) 分包；完整路径映射见 [API 迁移](api-migration.md)。CLI review 发布类型化 assessment 与 schema 3 聚合计划；执行层保留对通过相同严格校验的 schema 2 计划的读取能力。Go 根包只保留证据与结构验证。
 
 ## 机器格式和必要差异
 
@@ -34,9 +34,13 @@
 - 文本帮助、进度和 summary/device 可读报告采用简洁中文，排版不逐字复制 Ruby；自动化使用 JSON。错误保留安全代码，底层 Ruby 异常类名称不会跨语言复制。
 - Netdisco 接入原生 Go connector。HTTP/PostgreSQL 与缓存模式均已接线；缓存是 Go connector 私有格式/身份，不读取 Ruby 缓存文件。复用配置中的公开 `netdisco`/`inventory` 字段和 `ND_*`/筛选环境变量，包括自定义 `device_rules`；Ruby YAML 中非当前 connector schema 的字段明确拒绝。不要跨实现共用缓存目录。
 - 信号取消统一退出 130，确认输入期间同样有效。对于库中注入的任意 `io.Reader`，取消会立即返回，但调用者应在释放 App 时解除其阻塞读取；App 不关闭调用者持有的输入流。
-- `go.mod` 固定正式 `go-net-connector v0.6.0` / `go-expect v0.5.0`，包含共享 Netdisco Fetch API。构建和独立交付检查使用 `GOWORK=off`；源码消费者与已发布标签消费者分别验证，见 [验证说明](verification.md)。
+- `go.mod` 固定正式 `go-net-connector v0.7.1` / `go-expect v0.6.0`，包含共享 Netdisco Fetch API。构建和独立交付检查使用 `GOWORK=off`；源码消费者与已发布标签消费者分别验证，见 [验证说明](verification.md)。
 - 已接受且正文校验通过的命令，遇到后续回调、日志或取消错误仍保留维度解析结果；`collection` 单独记录错误并保持非成功。没有可验证正文时，该维度仍为 failed，仅保留回执元数据；设备拒绝或未完成原文不会作为配置事实解析。原始回执指纹来自 wire 字节，分页与编码转换不改变该指纹的输入；新增尝试进度字段不替换现有证据字段。具体 Go interface 变更见 [迁移说明](api-migration.md)。
 
 ## 验证边界
 
 金样与差分是已覆盖输入的证据，不是 NX-OS 全语法证明。2026-10-26 曾对 6 台真实 NX-OS 完成 SSH 只读采集，并与 Ruby 驱动/Collector 回放比对；该历史结果不能外推为新版实机验收。v0.2.0 的远程 CI、公开发布与正式版本消费者已验证，记录见 [验证说明](verification.md)。真实 PostgreSQL、生产配置写入、业务连通性与部署不在本次证据内。apply 测试使用合成会话或本地 PTY，没有下发生产配置。
+
+## 类型化模型等价性
+
+`fabric/equivalence_test.go` 将全部 431 条配置金样与 515 条运行态金样经解析器输出严格解码为类型化模型，并要求重新编码后除 omitempty 省略的零值外无事实丢失或新增；超出 int64 的设备计数器以 `fabric.Counter`（`json.Number`）精确保留。`schema 3` 的 `assessment.json` 为 Go 自有格式，不对应 Ruby 输出。

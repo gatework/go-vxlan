@@ -24,7 +24,7 @@ def within(path, roots):
 
 def violations(graph):
     failures = []
-    pure = {"parser", "collect", "configuration", "change", "review", "vendors", "internal/record", "internal/textparse"}
+    pure = {"parser", "collect", "configuration", "change", "vendors", "internal/record", "internal/textparse", "fabric", "rules"}
     forbidden_io = {"os", "io/fs", "net/http", "net/rpc", "database/sql", "path/filepath", "syscall"}
     transport = {"github.com/gatework/go-net-connector", "github.com/gatework/go-expect"}
     terminal = {"github.com/spf13", "golang.org/x/term"}
@@ -36,14 +36,21 @@ def violations(graph):
             local = dependency.removeprefix(MODULE + "/")
             if relative == "" and dependency.startswith(MODULE + "/") and not within(local, {"internal/record"}):
                 failures.append(f"root evidence -> {local}")
-            if within(relative, {"parser"}) and within(local, {"vendors", "collect", "configuration", "change", "review"}):
+            if within(relative, {"parser"}) and within(local, {"vendors", "collect", "configuration", "change", "fabric", "rules"}):
                 failures.append(f"parser -> {local}")
             if within(relative, {"collect"}) and within(local, {"vendors", "adapter", "internal/workflow"}):
                 failures.append(f"collect must consume the selected profile, not {local}")
-            if within(relative, {"configuration"}) and within(local, {"change", "review"}):
+            if within(relative, {"configuration"}) and within(local, {"change", "rules"}):
                 failures.append(f"configuration -> {local}")
-            if within(relative, {"change"}) and within(local, {"review"}):
+            if within(relative, {"change"}) and within(local, {"rules"}):
                 failures.append("change -> review")
+            # The typed model and its rule catalog depend only on evidence
+            # and go-netops; they never reach vendors, legacy review or I/O.
+            if within(relative, {"fabric"}) and dependency.startswith(MODULE + "/"):
+                failures.append(f"typed model fabric -> {local}")
+            # Rules may propose typed changes; change never depends on rules.
+            if within(relative, {"rules"}) and dependency.startswith(MODULE + "/") and not within(local, {"fabric", "change"}):
+                failures.append(f"rule catalog rules -> {local}")
             if within(relative, {"internal/workflow"}) and (
                 within(local, {"internal/cli", "internal/bootstrap", "adapter"})
                 or within(dependency, terminal | transport)

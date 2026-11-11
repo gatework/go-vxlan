@@ -10,6 +10,7 @@ import (
 	"github.com/gatework/go-vxlan/internal/record"
 )
 
+// WriteExecution publishes an owned execution checkpoint with durable publication semantics.
 func (r *Report) WriteExecution(ctx context.Context, state vxlan.Record) error {
 	if err := ctx.Err(); err != nil {
 		return err

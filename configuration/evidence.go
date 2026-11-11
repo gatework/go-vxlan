@@ -11,7 +11,7 @@ func CompleteConfig(document vxlan.Record) vxlan.Record {
 	if o["status"] != "complete" {
 		return nil
 	}
-	r, ok := record.RecordSlice(o["records"])
+	r, ok := record.Slice(o["records"])
 	if !ok || len(r) != 1 || r[0]["review_status"] != "complete" {
 		return nil
 	}

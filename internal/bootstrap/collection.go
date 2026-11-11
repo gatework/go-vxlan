@@ -39,7 +39,7 @@ func Collection(ctx context.Context, c Config, devices []any, open OpenFunc) (wo
 		return workflow.CollectionOptions{}, err
 	}
 	return workflow.CollectionOptions{
-		Devices:   record.Copy(devices).([]any),
+		Devices:   record.Clone(devices),
 		Directory: c.runtime.Directory,
 		Workers:   workers,
 		Policy:    policy,

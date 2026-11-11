@@ -37,15 +37,17 @@ class ArchitectureTest(unittest.TestCase):
     def test_forbidden_package_boundaries(self):
         module = architecture.MODULE
         for source, dependency in [
-            ("review/nested", "os"),
+            ("rules/nested", "os"),
             ("configuration/index", "net/http/httputil"),
             ("parser/model", module + "/vendors/nxos/grammar"),
             ("collect/batch", module + "/vendors/nxos"),
             ("configuration/index", module + "/change/render"),
-            ("change/render", module + "/review/fabric"),
+            ("change/render", module + "/rules/catalog"),
+            ("rules/catalog", module + "/configuration/index"),
+            ("fabric/model", module + "/vendors/nxos"),
             ("internal/workflow/apply/journal", module + "/internal/bootstrap/options"),
             ("internal/workflow/batch", module + "/adapter/device"),
-            ("", module + "/review/fabric"),
+            ("", module + "/rules/catalog"),
             ("cli/command", ""),
         ]:
             with self.subTest(source=source, dependency=dependency):
@@ -53,7 +55,7 @@ class ArchitectureTest(unittest.TestCase):
 
     def test_domain_helper_cannot_hide_application_dependency(self):
         for source, via, dependency in [
-            ("review/nested", "internal/shared", "internal/bootstrap/options"),
+            ("rules/nested", "internal/shared", "internal/bootstrap/options"),
             ("", "internal/record/helper", "report/store"),
         ]:
             with self.subTest(source=source):
@@ -64,7 +66,8 @@ class ArchitectureTest(unittest.TestCase):
         module = architecture.MODULE
         for source, dependency in [
             ("", module + "/internal/record/json"),
-            ("review/fabric", module + "/configuration/index"),
+            ("rules/catalog", module + "/fabric/model"),
+            ("rules/catalog", module + "/change/render"),
             ("configuration/index", "net/netip"),
             ("internal/workflow/batch", module + "/report/store"),
             ("internal/cli/command", module + "/internal/bootstrap/options"),

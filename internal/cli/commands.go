@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
-type commandExit int
+type exitError int
 
-func (e commandExit) Error() string { return "command incomplete" }
+func (e exitError) Error() string { return "command incomplete" }
 func (a *App) runCommands(ctx context.Context, args []string) int {
 	if len(args) > 1 {
 		switch args[0] {
@@ -49,7 +49,7 @@ func (a *App) runCommands(ctx context.Context, args []string) int {
 		c.Flags().AddFlagSet(a.commandFlags(name))
 		c.RunE = func(c *cobra.Command, _ []string) error {
 			if code := run(c.Context(), c.Flags()); code != 0 {
-				return commandExit(code)
+				return exitError(code)
 			}
 			return nil
 		}
@@ -60,10 +60,10 @@ func (a *App) runCommands(ctx context.Context, args []string) int {
 	add("collect", a.collect)
 	add("apply", a.apply)
 	add("review", a.review)
+	add("baseline", a.baseline)
 	err := root.ExecuteContext(ctx)
 	if err != nil {
-		var code commandExit
-		if errors.As(err, &code) {
+		if code, ok := errors.AsType[exitError](err); ok {
 			return int(code)
 		}
 		return a.fail(err)
@@ -95,6 +95,13 @@ func (a *App) commandFlags(name string) *pflag.FlagSet {
 	case "review":
 		for _, k := range []string{"batch", "output", "fabric-policy"} {
 			f.String(k, "", "批次或输出路径")
+		}
+		f.String("rules-policy", "", "风险规则策略 YAML：启用/禁用、严重级别、阈值")
+		f.String("baseline", "", "冻结的 Fabric 基线 YAML：报告偏离声明意图的配置")
+		f.String("previous", "", "上一批次目录：报告自上次采集以来的变化")
+	case "baseline":
+		for _, k := range []string{"batch", "fabric-policy", "output"} {
+			f.String(k, "", "批次、策略或输出路径")
 		}
 		f.Bool("scripts", false, "导出候选配置")
 		f.Bool("no-scripts", false, "不导出候选配置")

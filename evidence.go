@@ -3,6 +3,7 @@ package vxlan
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -39,6 +40,7 @@ func ProjectRecord(value any) (Record, error) {
 	return record, nil
 }
 
+//nolint:nilnil // JSON null is a valid projected value.
 func projectValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (any, error) {
 	if depth > 128 {
 		return nil, recordpkg.ErrEvidence
@@ -53,35 +55,8 @@ func projectValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (an
 		return projectValue(v.Elem(), active, depth)
 	}
 	if v.CanInterface() {
-		var projected any
-		switch x := v.Interface().(type) {
-		case Snapshot:
-			projected = Record{"target": x.Target, "fabric_key": x.FabricKey, "dimensions": x.Dimensions, "observed_at": x.ObservedAt}
-		case *Snapshot:
-			if x == nil {
-				return nil, nil
-			}
-			return projectValue(reflect.ValueOf(*x), active, depth)
-		case Observation:
-			projected = Record{"name": x.Name, "status": x.Status, "records": x.Records, "issues": x.Issues, "evidence": x.Evidence, "started_at": x.StartedAt, "completed_at": x.CompletedAt}
-		case time.Time:
-			if _, err := x.MarshalJSON(); err != nil {
-				return nil, recordpkg.ErrEvidence
-			}
-			return x.Format(time.RFC3339Nano), nil
-		case *time.Time:
-			if x == nil {
-				return nil, nil
-			}
-			return projectValue(reflect.ValueOf(*x), active, depth)
-		case json.Number:
-			if strings.TrimSpace(string(x)) != string(x) || !json.Valid([]byte(x)) || len(x) == 0 || x[0] != '-' && (x[0] < '0' || x[0] > '9') {
-				return nil, recordpkg.ErrEvidence
-			}
-			return documentNumber(x), nil
-		}
-		if projected != nil {
-			return projectValue(reflect.ValueOf(projected), active, depth)
+		if value, handled, err := projectDomainValue(v, active, depth); handled {
+			return value, err
 		}
 	}
 	switch v.Kind() {
@@ -96,23 +71,7 @@ func projectValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (an
 		active[key] = true
 		defer delete(active, key)
 		if v.Kind() == reflect.Map {
-			if v.Type().Key().Kind() != reflect.String {
-				return nil, recordpkg.ErrEvidence
-			}
-			out := make(Record, v.Len())
-			iter := v.MapRange()
-			for iter.Next() {
-				name := iter.Key().String()
-				if !utf8.ValidString(name) {
-					return nil, recordpkg.ErrEvidence
-				}
-				value, err := projectValue(iter.Value(), active, depth+1)
-				if err != nil {
-					return nil, err
-				}
-				out[name] = value
-			}
-			return out, nil
+			return projectMap(v, active, depth)
 		}
 		fallthrough
 	case reflect.Array:
@@ -137,15 +96,7 @@ func projectValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (an
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return documentNumber(json.Number(strconv.FormatUint(v.Uint(), 10))), nil
 	case reflect.Float32, reflect.Float64:
-		n := v.Float()
-		if math.IsNaN(n) || math.IsInf(n, 0) {
-			return nil, recordpkg.ErrEvidence
-		}
-		encoded, err := json.Marshal(v.Interface())
-		if err != nil {
-			return nil, recordpkg.ErrEvidence
-		}
-		return documentNumber(json.Number(encoded)), nil
+		return projectFloat(v)
 	default:
 		return nil, recordpkg.ErrEvidence
 	}
@@ -176,69 +127,12 @@ func DecodeDocument(body []byte) (Record, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
-	var read func(int) (any, error)
-	read = func(depth int) (any, error) {
-		if depth > 128 {
-			return nil, fmt.Errorf("JSON 嵌套过深")
-		}
-		token, e := decoder.Token()
-		if e != nil {
-			return nil, e
-		}
-		switch t := token.(type) {
-		case json.Delim:
-			switch t {
-			case '{':
-				m := Record{}
-				for decoder.More() {
-					key, e := decoder.Token()
-					if e != nil {
-						return nil, e
-					}
-					k, ok := key.(string)
-					if !ok {
-						return nil, fmt.Errorf("JSON 键无效")
-					}
-					if _, exists := m[k]; exists {
-						return nil, fmt.Errorf("JSON 包含重复键")
-					}
-					value, e := read(depth + 1)
-					if e != nil {
-						return nil, e
-					}
-					m[k] = value
-				}
-				if _, e = decoder.Token(); e != nil {
-					return nil, e
-				}
-				return m, nil
-			case '[':
-				a := []any{}
-				for decoder.More() {
-					value, e := read(depth + 1)
-					if e != nil {
-						return nil, e
-					}
-					a = append(a, value)
-				}
-				if _, e = decoder.Token(); e != nil {
-					return nil, e
-				}
-				return a, nil
-			default:
-				return nil, fmt.Errorf("JSON 分隔符无效")
-			}
-		case json.Number:
-			return documentNumber(t), nil
-		default:
-			return token, nil
-		}
-	}
-	value, e := read(0)
+	reader := evidenceDecoder{decoder}
+	value, e := reader.read(0)
 	if e != nil {
 		return nil, e
 	}
-	if _, e = decoder.Token(); e != io.EOF {
+	if _, e = decoder.Token(); !errors.Is(e, io.EOF) {
 		return nil, fmt.Errorf("JSON 存在多余内容")
 	}
 	m, ok := value.(map[string]any)
@@ -300,34 +194,8 @@ func validateEvidenceDocument(doc Record) error {
 		return fmt.Errorf("设备与快照身份不一致")
 	}
 	for name, value := range dims {
-		o, ok := value.(map[string]any)
-		if !ok || !slices.Contains([]string{"complete", "partial", "failed", "unsupported", "not_requested"}, evidenceString(o["status"])) {
-			return fmt.Errorf("观测状态无效")
-		}
-		rows, ok := o["records"].([]any)
-		if !ok {
-			return fmt.Errorf("观测记录须为数组")
-		}
-		if issues, ok := o["issues"]; ok {
-			if _, ok = issues.([]any); !ok {
-				return fmt.Errorf("诊断须为数组")
-			}
-			for _, x := range evidenceList(issues) {
-				if _, ok = x.(map[string]any); !ok {
-					return fmt.Errorf("诊断须为记录")
-				}
-			}
-		}
-		for _, row := range rows {
-			r, ok := row.(map[string]any)
-			if !ok {
-				return fmt.Errorf("观测记录无效")
-			}
-			if name == "configuration" {
-				if e := validateConfigurationRecord(r); e != nil {
-					return e
-				}
-			}
+		if err := validateObservationRecord(name, value); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -343,45 +211,23 @@ func ValidateConfigurationRecord(record Record) error {
 }
 
 func validateConfigurationRecord(r Record) error {
-	records := func(v any) error {
-		a, ok := v.([]any)
-		if !ok {
-			return fmt.Errorf("配置列表无效")
-		}
-		for _, x := range a {
-			if _, ok := x.(map[string]any); !ok {
-				return fmt.Errorf("配置条目无效")
-			}
-		}
-		return nil
-	}
+
 	if v, ok := r["review_findings"]; ok {
-		if e := records(v); e != nil {
+		if e := validateConfigurationRecords(v); e != nil {
 			return e
 		}
 	}
 	for _, x := range evidenceObject(r["evpn"]) {
 		if v, ok := evidenceObject(x)["route_targets"]; ok {
-			if e := records(v); e != nil {
+			if e := validateConfigurationRecords(v); e != nil {
 				return e
 			}
 		}
 	}
-	hashes := func(v any) error {
-		m, ok := v.(map[string]any)
-		if !ok {
-			return fmt.Errorf("配置映射无效")
-		}
-		for _, x := range m {
-			if _, ok = x.(map[string]any); !ok {
-				return fmt.Errorf("配置记录无效")
-			}
-		}
-		return nil
-	}
+
 	for _, k := range []string{"interfaces", "vrfs", "evpn"} {
 		if v, ok := r[k]; ok {
-			if e := hashes(v); e != nil {
+			if e := validateConfigurationHashes(v); e != nil {
 				return e
 			}
 		}
@@ -394,11 +240,208 @@ func validateConfigurationRecord(r Record) error {
 		}
 	}
 	if v, ok := evidenceObject(r["nve"])["members"]; ok {
-		if e := hashes(v); e != nil {
+		if e := validateConfigurationHashes(v); e != nil {
 			return e
 		}
 	}
-	for _, x := range evidenceObject(r["interfaces"]) {
+	if err := validateInterfaceRecords(evidenceObject(r["interfaces"])); err != nil {
+		return err
+	}
+	if err := validateACLRecords(evidenceObject(r["acls"])); err != nil {
+		return err
+	}
+	if err := validateAddressGroups(evidenceObject(r["address_groups"])); err != nil {
+		return err
+	}
+	return nil
+}
+
+func projectDomainValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (any, bool, error) {
+	var projected any
+	switch x := v.Interface().(type) {
+	case Snapshot:
+		projected = Record{"target": x.Target, "fabric_key": x.FabricKey, "dimensions": x.Dimensions, "observed_at": x.ObservedAt}
+	case *Snapshot:
+		if x == nil {
+			return nil, true, nil
+		}
+		value, err := projectValue(reflect.ValueOf(*x), active, depth)
+		return value, true, err
+	case Observation:
+		projected = Record{"name": x.Name, "status": x.Status, "records": x.Records, "issues": x.Issues, "evidence": x.Evidence, "started_at": x.StartedAt, "completed_at": x.CompletedAt}
+	case time.Time:
+		if _, err := x.MarshalJSON(); err != nil {
+			return nil, true, recordpkg.ErrEvidence
+		}
+		return x.Format(time.RFC3339Nano), true, nil
+	case *time.Time:
+		if x == nil {
+			return nil, true, nil
+		}
+		value, err := projectValue(reflect.ValueOf(*x), active, depth)
+		return value, true, err
+	case json.Number:
+		if strings.TrimSpace(string(x)) != string(x) || !json.Valid([]byte(x)) || len(x) == 0 || x[0] != '-' && (x[0] < '0' || x[0] > '9') {
+			return nil, true, recordpkg.ErrEvidence
+		}
+		return documentNumber(x), true, nil
+	}
+	if projected != nil {
+		value, err := projectValue(reflect.ValueOf(projected), active, depth)
+		return value, true, err
+	}
+	return nil, false, nil
+}
+
+func projectMap(v reflect.Value, active map[evidenceVisit]bool, depth int) (any, error) {
+	if v.Type().Key().Kind() != reflect.String {
+		return nil, recordpkg.ErrEvidence
+	}
+	out := make(Record, v.Len())
+	iter := v.MapRange()
+	for iter.Next() {
+		name := iter.Key().String()
+		if !utf8.ValidString(name) {
+			return nil, recordpkg.ErrEvidence
+		}
+		value, err := projectValue(iter.Value(), active, depth+1)
+		if err != nil {
+			return nil, err
+		}
+		out[name] = value
+	}
+	return out, nil
+}
+
+func (d evidenceDecoder) object(depth int) (any, error) {
+	m := Record{}
+	for d.decoder.More() {
+		key, e := d.decoder.Token()
+		if e != nil {
+			return nil, e
+		}
+		k, ok := key.(string)
+		if !ok {
+			return nil, fmt.Errorf("JSON 键无效")
+		}
+		if _, exists := m[k]; exists {
+			return nil, fmt.Errorf("JSON 包含重复键")
+		}
+		value, e := d.read(depth + 1)
+		if e != nil {
+			return nil, e
+		}
+		m[k] = value
+	}
+	if _, e := d.decoder.Token(); e != nil {
+		return nil, e
+	}
+	return m, nil
+}
+
+func (d evidenceDecoder) array(depth int) (any, error) {
+	a := []any{}
+	for d.decoder.More() {
+		value, e := d.read(depth + 1)
+		if e != nil {
+			return nil, e
+		}
+		a = append(a, value)
+	}
+	if _, e := d.decoder.Token(); e != nil {
+		return nil, e
+	}
+	return a, nil
+}
+
+type evidenceDecoder struct{ decoder *json.Decoder }
+
+func (d evidenceDecoder) read(depth int) (any, error) {
+	if depth > 128 {
+		return nil, fmt.Errorf("JSON 嵌套过深")
+	}
+	token, e := d.decoder.Token()
+	if e != nil {
+		return nil, e
+	}
+	switch t := token.(type) {
+	case json.Delim:
+		switch t {
+		case '{':
+			return d.object(depth)
+		case '[':
+			return d.array(depth)
+		default:
+			return nil, fmt.Errorf("JSON 分隔符无效")
+		}
+	case json.Number:
+		return documentNumber(t), nil
+	default:
+		return token, nil
+	}
+}
+
+func validateObservationRecord(name string, value any) error {
+	o, ok := value.(map[string]any)
+	if !ok || !slices.Contains([]string{"complete", "partial", "failed", "unsupported", "not_requested"}, evidenceString(o["status"])) {
+		return fmt.Errorf("观测状态无效")
+	}
+	rows, ok := o["records"].([]any)
+	if !ok {
+		return fmt.Errorf("观测记录须为数组")
+	}
+	if issues, ok := o["issues"]; ok {
+		if _, ok = issues.([]any); !ok {
+			return fmt.Errorf("诊断须为数组")
+		}
+		for _, x := range evidenceList(issues) {
+			if _, ok = x.(map[string]any); !ok {
+				return fmt.Errorf("诊断须为记录")
+			}
+		}
+	}
+	for _, row := range rows {
+		r, ok := row.(map[string]any)
+		if !ok {
+			return fmt.Errorf("观测记录无效")
+		}
+		if name == "configuration" {
+			if e := validateConfigurationRecord(r); e != nil {
+				return e
+			}
+		}
+	}
+	return nil
+}
+
+func validateConfigurationRecords(v any) error {
+	a, ok := v.([]any)
+	if !ok {
+		return fmt.Errorf("配置列表无效")
+	}
+	for _, x := range a {
+		if _, ok := x.(map[string]any); !ok {
+			return fmt.Errorf("配置条目无效")
+		}
+	}
+	return nil
+}
+
+func validateConfigurationHashes(v any) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("配置映射无效")
+	}
+	for _, x := range m {
+		if _, ok = x.(map[string]any); !ok {
+			return fmt.Errorf("配置记录无效")
+		}
+	}
+	return nil
+}
+
+func validateInterfaceRecords(records Record) error {
+	for _, x := range records {
 		v := evidenceObject(x)
 		if a, ok := v["addresses"]; ok {
 			if evidenceList(a) == nil {
@@ -422,7 +465,11 @@ func validateConfigurationRecord(r Record) error {
 			}
 		}
 	}
-	for _, v := range evidenceObject(r["acls"]) {
+	return nil
+}
+
+func validateACLRecords(records Record) error {
+	for _, v := range records {
 		if evidenceList(v) == nil {
 			return fmt.Errorf("ACL 规则无效")
 		}
@@ -436,7 +483,11 @@ func validateConfigurationRecord(r Record) error {
 			}
 		}
 	}
-	for _, v := range evidenceObject(r["address_groups"]) {
+	return nil
+}
+
+func validateAddressGroups(records Record) error {
+	for _, v := range records {
 		if evidenceList(v) == nil {
 			return fmt.Errorf("地址组无效")
 		}
@@ -448,4 +499,16 @@ func validateConfigurationRecord(r Record) error {
 		}
 	}
 	return nil
+}
+
+func projectFloat(v reflect.Value) (any, error) {
+	n := v.Float()
+	if math.IsNaN(n) || math.IsInf(n, 0) {
+		return nil, recordpkg.ErrEvidence
+	}
+	encoded, err := json.Marshal(v.Interface())
+	if err != nil {
+		return nil, recordpkg.ErrEvidence
+	}
+	return documentNumber(json.Number(encoded)), nil
 }

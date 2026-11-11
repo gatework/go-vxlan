@@ -10,8 +10,10 @@ import (
 	"github.com/gatework/go-vxlan/vendors/nxos"
 )
 
+// ConfigurationSession adapts a borrowed command session to configuration reads.
 type ConfigurationSession struct{ collect.Session }
 
+// ReadConfiguration captures one complete configuration through the borrowed operation.
 func (s ConfigurationSession) ReadConfiguration(ctx context.Context) (vxlan.Record, error) {
 	if s.Session == nil {
 		return nil, change.ErrExecutionPlan
@@ -35,7 +37,7 @@ func (s ConfigurationSession) ReadConfiguration(ctx context.Context) (vxlan.Reco
 
 func (s ConfigurationSession) Write(ctx context.Context, command string) error {
 	writer, ok := s.Session.(interface {
-		Write(context.Context, string) error
+		Write(ctx context.Context, command string) error
 	})
 	if !ok {
 		return change.ErrExecutionPlan

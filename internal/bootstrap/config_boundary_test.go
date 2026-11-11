@@ -9,10 +9,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"golang.org/x/sys/unix"
+
 	ncconfig "github.com/gatework/go-net-connector/config"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
-	"golang.org/x/sys/unix"
 )
 
 func TestConfigurationReadBoundary(t *testing.T) {

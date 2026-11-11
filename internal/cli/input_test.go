@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestCancelledInputReturnsWithoutWaitingForNewline(t *testing.T) {
 	cancel()
 	select {
 	case e := <-done:
-		if e != context.Canceled {
+		if !errors.Is(e, context.Canceled) {
 			t.Fatal(e)
 		}
 	case <-time.After(time.Second):

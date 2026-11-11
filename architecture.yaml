@@ -1,0 +1,54 @@
+# Shared declaration supplements the existing import-graph regression gate.
+declared:
+  - .
+  - ./adapter/netconnector
+  - ./change
+  - ./cmd/vxlan
+  - ./collect
+  - ./configuration
+  - ./fabric
+  - ./internal/bootstrap
+  - ./internal/cli
+  - ./internal/record
+  - ./internal/textparse
+  - ./internal/workflow
+  - ./internal/workflow/apply
+  - ./parser
+  - ./report
+  - ./rules
+  - ./vendors
+  - ./vendors/nxos
+
+rules:
+  - name: root evidence only depends on record helpers
+    packages: [.]
+    only_local: [./internal/record]
+    transitive: true
+  - name: domain packages do not depend on application or transport
+    packages: [., ./parser/..., ./collect/..., ./configuration/..., ./change/..., ./vendors/..., ./fabric/..., ./rules/...]
+    deny: [./adapter/..., ./report/..., ./internal/cli/..., ./internal/bootstrap/..., ./internal/workflow/..., github.com/gatework/go-net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]
+    transitive: true
+  - name: domain packages do no direct file or network IO
+    packages: [., ./parser/..., ./collect/..., ./configuration/..., ./change/..., ./vendors/..., ./fabric/..., ./rules/...]
+    deny: [os, io/fs, net, net/http/..., net/rpc/..., database/sql/..., path/filepath, syscall, golang.org/x/sys/...]
+  - name: parser stays vendor and domain neutral
+    packages: [./parser/...]
+    deny: [./vendors/..., ./collect/..., ./configuration/..., ./change/..., ./fabric/..., ./rules/...]
+  - name: collection consumes caller selected profiles
+    packages: [./collect/...]
+    deny: [./vendors/...]
+  - name: configuration does not depend on changes or rule catalogs
+    packages: [./configuration/...]
+    deny: [./change/..., ./rules/...]
+  - name: changes do not depend on rule catalogs
+    packages: [./change/...]
+    deny: [./rules/...]
+  - name: the typed fabric model has no local dependency
+    packages: [./fabric/...]
+    deny: [./...]
+  - name: the rule catalog uses the typed model and changes
+    packages: [./rules/...]
+    only_local: [./fabric, ./change]
+  - name: workflows do not import composition or transport
+    packages: [./internal/workflow/...]
+    deny: [./internal/cli/..., ./internal/bootstrap/..., ./adapter/..., github.com/gatework/go-net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]

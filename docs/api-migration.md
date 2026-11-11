@@ -1,4 +1,16 @@
-# 公共 API 迁移
+# v0.4.0 类型化业务 API 迁移
+
+本版本采用 `fabric` 类型化模型、go-netops v0.3.0 的规则引擎与类型化变更契约。Go 调用者需迁移至类型化模型与规则接口；CLI 新生成的计划使用 schema 3，执行层继续接受通过相同严格校验的 schema 2 计划。任何配置变化仍会使计划过期。
+
+- `fabric.Model`、`fabric.Device`、`fabric.Configuration` 承载业务事实；未知事实将相关维度降为 partial，不能作为健康或可执行结论的依据。
+- `rules.NewAssessor` / `AssessWith` 替代旧 review 推荐入口，支持策略、基线和前后批次比较。可执行增量由 `rules.Increments` 生成。
+- `change.SVIGateway`、`VLANVNI`、`SVIACL` 实现 go-netops 的类型化变更契约；`change.NewExecutionPlan` 绑定目标、原配置指纹和精确命令，下发前与回读后均需校验。
+- CLI 审查输出为 assessment、plan 和关联设备报告。计划 schema 为 3；设备确认、单项执行、不自动重放/回退和不自动保存配置的约束保持。
+- 正式运行依赖固定 go-net-connector v0.7.1、go-expect v0.6.0、go-netops v0.3.0；自定义连接采用平台声明或 StaticDriver，配置加载使用 Connector 的当前 API。
+
+开发使用 go-standards v1.0.2 的 `make check`。完整接口与所有权边界见 [架构](architecture.md)。
+
+## v0.3.1 历史迁移
 
 这是用户批准的公共 Go API 调整，不保留旧根包/公开 cli 的转发层。CLI 参数、默认值、JSON/schema、确认串与正常设备命令顺序保持不变；取消或输出失败发生在最终回调时，批次摘要会重新写为 interrupted/incomplete，修复原来返回状态与已发布摘要不一致的问题。包职责与依赖图见 [architecture.md](architecture.md)。
 
@@ -147,3 +159,25 @@ Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明
 ## v0.3.1 依赖更新
 
 采用正式 Connector v0.6.0、Expect v0.5.0。Netdisco 缓存模式在内部调用边界转换为 `netdisco.CacheMode`；配置中的 prefer、refresh、only 取值不变。公开 VXLAN API 与设备命令不变。
+
+## 未发布：类型化模型与风险评估
+
+新增公开包 `fabric`（类型化模型、`DecodeDocument`、`Build`、`Policy`、`Configuration.Services`）与 `rules`（`NewAssessor`、`Assess`、`DeviceRules`、`FabricRules`、`RuleIDs`、`Report`）。依赖 go-netops v0.1.1。既有公开 API、CLI 参数与 `plan.json` 不变；`review` 新增 `--rules-policy`，批次新增 `assessment.json`，`summary.json` 新增 `assessment`、`risk_counts`、`risk_highest`、`assessment_incomplete` 字段。
+
+新增：`fabric.Baseline`/`Expectation`/`DecodeBaseline`、`fabric.Operations`、`rules.Inputs`、`Assessor.AssessWith`、`rules.DeriveBaseline`、`BaselineRules`、`TemporalRules`；CLI 新增 `vxlan baseline` 与 `review --baseline`、`--previous`；`assessment.json` 新增 `baseline`、`changes`、`appeared`、`disappeared`。
+
+## 未发布：旧审查下线
+
+删除 `review` 包（`ReviewFabric`、`Recommendations`、`Advice`、`CombineRecommendations`、`ValidateFabricPolicy`、`QueryCatalog`、`InferServiceMapping`）与 `change.ChangePlan`/`NewChangePlan`/`CandidateChangePlan`。替代：
+
+| 旧 | 新 |
+| --- | --- |
+| `review.ValidateFabricPolicy` | `fabric.ValidatePolicyDocument` / `fabric.DecodePolicy` |
+| `review.ReviewFabric`、`Recommendations`、`Advice` | `rules.NewAssessor(policy, profile).Assess(ctx, model)` |
+| `InferServiceMapping` 与 Fabric 候选 | `rules.Increments(fabric, profile)` |
+| `change.NewChangePlan` | `change.DecodeChange`；`Render`、`Eligible`、`Satisfied`、`Preserved` |
+| `review.QueryCatalog` | `workflow.Queries`（内部）；`rules.Commands` / `rules.Verifier` |
+
+输出：`plan.json` schema 3 去掉 `audits` 与 `fabric`（改见 `assessment.json`），`summary.json` 的 `counts` 改为 `increments` 与 `risk_counts`，`layout_version` 4；采集证据文档的 `recommendations` 改为 `assessment`。`apply` 同时接受 schema 2 与 3 的计划。
+
+`configuration` 中的 `ACLRules`、`ResolveACLPolicy`、`ACLBindings`、`AddressGroupReferences`、`ServiceCatalog`、`CatalogForHosts`、`EffectiveNVEMember`、`ServiceRouteTargets`、`ServiceTenant`、`ServiceMappingSignature`、`Network`、`Overlap`、`NewSubnetIndex`、`BGPNeighbors`、`PrefixListReferences` 已删除；替代为 `fabric.OrderedRules`、`Configuration.ResolveACL`、`Configuration.Services`、`EffectiveMember`、`ExpandRouteTargets`、`Tenant`、`fabric.NewSubnetIndex`（`BGPNeighbors`/`PrefixListReferences` 无规则使用，不再提供）。ACL 序号上限 4294967295 现在同样作用于类型化增量。

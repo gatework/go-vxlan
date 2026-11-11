@@ -1,6 +1,8 @@
 package nxos
 
 import (
+	"slices"
+
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/internal/textparse"
@@ -29,12 +31,7 @@ func unconfigured(name string, o vxlan.Observation) bool {
 		if d["vpc_domain"] != nil {
 			return false
 		}
-		for _, v := range record.StringSlice(d["features"]) {
-			if v == "vpc" {
-				return false
-			}
-		}
-		return true
+		return !slices.Contains(record.StringSlice(d["features"]), "vpc")
 	case "nve_peers", "nve_vnis":
 		return record.Map(d["nve"])["interface"] == nil
 	case "port_channels":

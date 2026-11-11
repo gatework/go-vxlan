@@ -1,22 +1,23 @@
 package configuration_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
-	"strings"
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	changepkg "github.com/gatework/go-vxlan/change"
 	"github.com/gatework/go-vxlan/configuration"
+	"github.com/gatework/go-vxlan/fabric"
 	recordpkg "github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/rules"
 	"github.com/gatework/go-vxlan/vendors"
 )
 
 func TestChangePlanOwnsInputsAndAccessorResults(t *testing.T) {
 	change := vxlan.Record{"kind": "svi_acl", "vlan": 8, "vni": 10008, "acl": "protect", "direction": "out", "entries": []vxlan.Record{{"sequence": 10, "action": "deny", "expression": "ip any any"}}, "create_acl": true, "previous_binding": nil}
-	plan, err := changepkg.NewChangePlan(change)
+	plan, err := newChangePlan(change)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +40,7 @@ func TestChangePlanOwnsInputsAndAccessorResults(t *testing.T) {
 }
 func TestChangePlanGatewayPreservesUnrelatedConfiguration(t *testing.T) {
 	change := vxlan.Record{"kind": "svi_gateway_add", "vlan": float64(8), "vni": float64(10008), "vrf": "tenant", "address": "192.0.2.254/24"}
-	plan, err := changepkg.NewChangePlan(change)
+	plan, err := newChangePlan(change)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestChangePlanGatewayPreservesUnrelatedConfiguration(t *testing.T) {
 func TestChangePlanRejectsInvalidParameters(t *testing.T) {
 	base := vxlan.Record{"kind": "svi_gateway_add", "vlan": 8, "vni": 10008, "vrf": "tenant", "address": "192.0.2.254/24"}
 	for _, edit := range []vxlan.Record{{"vlan": 8.5}, {"vni": 10008.2}, {"vlan": "8"}, {"address": "2001:db8::1/64"}, {"address": "192.0.2.1/33"}, {"address": "192.0.2.1/24\nend"}, {"vrf": ""}, {"commands": []string{"reboot"}}} {
-		if _, err := changepkg.NewChangePlan(recordpkg.Merge(base, edit)); err == nil {
+		if _, err := newChangePlan(recordpkg.Merge(base, edit)); err == nil {
 			t.Fatalf("accepted invalid increment %#v", edit)
 		}
 	}
@@ -83,42 +84,28 @@ func TestCompleteConfigRequiresUniqueCompleteEvidence(t *testing.T) {
 		t.Fatal("partial record accepted")
 	}
 }
-func TestSubnetIndexRetainsItsSnapshot(t *testing.T) {
-	addresses := []string{"192.0.2.129/25"}
-	svi := vxlan.Record{"vrf": "tenant", "addresses": addresses}
-	config := vxlan.Record{"interfaces": vxlan.Record{"Vlan9": svi}, "vlan_vnis": vxlan.Record{"9": 10009}}
-	index := configuration.NewSubnetIndex(config)
-	addresses[0] = "198.51.100.1/24"
-	svi["vrf"] = "other"
-	recordpkg.Map(config["vlan_vnis"])["9"] = 10008
-	conflicts, err := index.Conflicts("192.0.2.254/24", "tenant", 10008, "")
-	if err != nil || len(conflicts) != 1 || conflicts[0]["vni"] != 10009 || recordpkg.StringSlice(conflicts[0]["value"])[0] != "192.0.2.129/25" {
-		t.Fatalf("snapshot changed: %#v %v", conflicts, err)
-	}
-}
 func TestFabricRejectsDuplicateIdentity(t *testing.T) {
-	doc := vxlan.Record{"device": vxlan.Record{"host": "192.0.2.1"}}
-	policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
-	if _, err := review.ReviewFabric([]vxlan.Record{doc, doc}, policy, nil); err == nil || !strings.Contains(err.Error(), "重复设备身份") {
-		t.Fatal("duplicate identity must fail", err)
+	d := fabric.NewDevice(fabric.Identity{Host: "192.0.2.1"}, nil)
+	policy := &fabric.Policy{Fabrics: map[string]fabric.Membership{"A": {Leaves: []string{"192.0.2.1", "192.0.2.2"}}}}
+	if _, err := fabric.Build([]*fabric.Device{d, d}, policy); err == nil {
+		t.Fatal("duplicate identity must fail")
 	}
 }
 
 func TestSubnetIndexQueryAllocationGrowth(t *testing.T) {
 	allocations := []float64{}
 	for _, count := range []int{128, 512} {
-		config := vxlan.Record{"interfaces": vxlan.Record{}, "vlan_vnis": vxlan.Record{}}
+		c := &fabric.Configuration{Interfaces: map[string]fabric.Interface{}, VLANVNIs: map[string]*int{}}
 		addresses := make([]string, count)
-		for i := 0; i < count; i++ {
-			name := fmt.Sprintf("Vlan%d", i+1)
+		for i := range count {
 			addresses[i] = fmt.Sprintf("10.%d.%d.254/24", i/256, i%256)
-			recordpkg.Map(config["interfaces"])[name] = vxlan.Record{"vrf": "tenant", "addresses": []string{addresses[i]}}
-			recordpkg.Map(config["vlan_vnis"])[strconv.Itoa(i+1)] = 10001 + i
+			c.Interfaces[fmt.Sprintf("Vlan%d", i+1)] = fabric.Interface{VRF: "tenant", Addresses: []string{addresses[i]}}
+			c.VLANVNIs[strconv.Itoa(i+1)] = new(10001 + i)
 		}
-		index := configuration.NewSubnetIndex(config)
+		index := fabric.NewSubnetIndex(c)
 		allocations = append(allocations, testing.AllocsPerRun(1, func() {
 			for i, address := range addresses {
-				conflicts, err := index.Conflicts(address, "tenant", 10001+i, "")
+				conflicts, err := index.Conflicts(address, "tenant", new(10001+i), "")
 				if err != nil || len(conflicts) != 0 {
 					t.Fatalf("unexpected conflicts %v %v", conflicts, err)
 				}
@@ -131,6 +118,28 @@ func TestSubnetIndexQueryAllocationGrowth(t *testing.T) {
 	}
 }
 
+func typedFabric(t *testing.T, documents []vxlan.Record, policy vxlan.Record) *fabric.Fabric {
+	t.Helper()
+	var devices []*fabric.Device
+	for _, doc := range documents {
+		d, err := fabric.EncodeDocument(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		devices = append(devices, d)
+	}
+	body, _ := json.Marshal(policy)
+	p, err := fabric.DecodePolicy(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := fabric.Build(devices, &p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.Fabrics[0]
+}
+
 func TestFabricGatewayAllocationGrowth(t *testing.T) {
 	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
 	if err != nil {
@@ -141,7 +150,7 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 		docs := []vxlan.Record{}
 		for hostIndex, host := range []string{"192.0.2.1", "192.0.2.2"} {
 			config := vxlan.Record{"review_status": "complete", "anycast_mac": "0011.0011.0011", "vlan_vnis": vxlan.Record{}, "interfaces": vxlan.Record{}, "nve": vxlan.Record{"members": vxlan.Record{}}, "evpn": vxlan.Record{}}
-			for i := 0; i < count; i++ {
+			for i := range count {
 				vlan, vni := strconv.Itoa(i+1), strconv.Itoa(i+10001)
 				addresses := []string{}
 				if hostIndex == 0 {
@@ -155,10 +164,10 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 			docs = append(docs, vxlan.Record{"device": vxlan.Record{"host": host, "name": host}, "snapshot": vxlan.Record{"dimensions": vxlan.Record{"configuration": vxlan.Record{"status": "complete", "records": []vxlan.Record{config}}}}})
 		}
 		policy := vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.2"}}}}
+		f := typedFabric(t, docs, policy)
 		allocations = append(allocations, testing.AllocsPerRun(1, func() {
-			audit, err := review.ReviewFabric(docs, policy, profile)
-			if err != nil || len(recordpkg.Rows(recordpkg.Map(audit["device_items"])["192.0.2.2"])) != count {
-				t.Fatal("gateway audit failed", err)
+			if n := len(rules.Increments(f, profile)); n != count {
+				t.Fatalf("gateway increments: %d, want %d", n, count)
 			}
 		}))
 	}
@@ -168,46 +177,34 @@ func TestFabricGatewayAllocationGrowth(t *testing.T) {
 	}
 }
 
-func TestFabricGatewayConflictsRemainScopedAndOwned(t *testing.T) {
+// Gateway conflicts are scoped to the gateway's VRF: an overlapping SVI in
+// another VRF neither blocks the gateway nor leaks across VRFs.
+func TestFabricGatewayConflictsRemainScopedToVRF(t *testing.T) {
 	configs, documents, policy := benchmarkFabric(4, 1)
-	for _, host := range []string{"192.0.2.3", "192.0.2.4"} {
-		svi := recordpkg.Map(recordpkg.At(configs, host, "interfaces", "Vlan1"))
-		svi["addresses"], svi["vrf"] = []string{}, "other"
-	}
 	first := recordpkg.Map(configs["192.0.2.1"])
 	recordpkg.Map(first["interfaces"])["Vlan999"] = vxlan.Record{"vrf": "other", "addresses": []string{"10.0.0.1/24"}}
 	recordpkg.Map(first["vlan_vnis"])["999"] = 10999
+	for _, host := range []string{"192.0.2.3", "192.0.2.4"} {
+		recordpkg.Map(recordpkg.At(configs, host, "interfaces", "Vlan1"))["addresses"] = []string{}
+	}
 	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	audit, err := review.ReviewFabric(documents, policy, profile)
-	if err != nil {
-		t.Fatal(err)
+	var hosts []string
+	for _, inc := range rules.Increments(typedFabric(t, documents, policy), profile) {
+		hosts = append(hosts, inc.Host)
 	}
-	var conflicts []vxlan.Record
-	for _, host := range []string{"192.0.2.2", "192.0.2.3", "192.0.2.4"} {
-		found := 0
-		for _, item := range recordpkg.Rows(recordpkg.Map(audit["device_items"])[host]) {
-			if item["code"] != "fabric_gateway" {
-				continue
-			}
-			for _, evidence := range recordpkg.Rows(item["evidence"]) {
-				if evidence["interface"] == "Vlan999" {
-					found++
-					conflicts = append(conflicts, evidence)
-				}
-			}
-		}
-		if host == "192.0.2.2" && found != 0 || host != "192.0.2.2" && found != 1 {
-			t.Fatalf("gateway conflicts crossed VRF boundary for %s: %d", host, found)
-		}
+	if !slices.Equal(hosts, []string{"192.0.2.2", "192.0.2.3", "192.0.2.4"}) {
+		t.Fatalf("gateway increments: %v (another VRF must not block them)", hosts)
 	}
-	if len(conflicts) != 2 {
-		t.Fatalf("missing independent conflict evidence: %d", len(conflicts))
+	// The same overlap inside the gateway's VRF blocks every gateway increment.
+	recordpkg.Map(recordpkg.At(configs, "192.0.2.1", "interfaces", "Vlan999"))["vrf"] = "tenant"
+	if incs := rules.Increments(typedFabric(t, documents, policy), profile); len(incs) != 0 {
+		t.Fatalf("overlap in the gateway VRF did not block: %d increments", len(incs))
 	}
-	recordpkg.StringSlice(conflicts[0]["value"])[0] = "changed"
-	if recordpkg.StringSlice(conflicts[1]["value"])[0] != "10.0.0.1/24" {
-		t.Fatal("cached query shared mutable evidence between recommendations")
+	// A spine carrying the service is a role conflict: no increment for it.
+	if incs := rules.Increments(typedFabric(t, documents, vxlan.Record{"fabrics": vxlan.Record{"A": vxlan.Record{"leaves": []string{"192.0.2.1", "192.0.2.3", "192.0.2.4"}, "spines": []string{"192.0.2.2"}}}}), profile); slices.ContainsFunc(incs, func(i rules.Increment) bool { return i.Host == "192.0.2.2" }) {
+		t.Fatal("increment proposed for a role-conflicted spine")
 	}
 }

@@ -9,11 +9,12 @@
 | `vendors/nxos` | NX-OS 配置/运行态语法、来源文档、准备命令及有证据支持的空表策略；`cfgState.finalize` 保留在解析器内 |
 | `vendors` | 显式构造内置 registry；没有 `init` 注册或可变全局 registry |
 | `collect` | 按调用方选定的 profile 借用单设备会话，保留 Capture 与独立错误；不挑选厂商或创建传输 |
-| `configuration` | ACL 依赖/绑定、子网索引、路由策略引用、业务目录与配置关系；不生成变更 |
-| `review` | 设备/Fabric 诊断、业务候选推导、人工 NVE/EVPN 建议；验证命令来自传入的 profile 能力 |
-| `change` | 三种可执行业务增量、NX-OS 渲染、不可变 ExecutionPlan、写前与读后验证；不连接设备 |
+| `configuration` | 解析器使用的 VLAN/NVE/EVPN/VRF 配置关系（`review_findings`）与 `CompleteConfig`；ACL 策略、业务目录、网段索引与 RT 展开已移至类型化 `fabric` |
+| `change` | 三种可执行业务增量（类型化 `SVIGateway`/`VLANVNI`/`SVIACL`）、NX-OS 渲染、不可变 ExecutionPlan、写前准入与读后保留校验；不连接设备 |
 | `report` | 私有文件、精确 JSON、报告文本、原子发布和执行检查点；不决定业务候选 |
 | `adapter/netconnector` | Connector 回执、操作 context、采集/配置会话适配；保留传输生命周期错误 |
+| `fabric` | 类型化 VXLAN/EVPN 领域模型（配置、运行态、设备、Fabric 成员与角色、L2 服务视图）；严格解码解析器输出，未知字段使维度降为 partial（`unmodeled_fact`），不静默丢弃事实 |
+| `rules` | 基于 go-netops `assess` 的风险规则目录：设备规则 `Rule[*fabric.Device]` 与 Fabric 规则 `Rule[*fabric.Fabric]`；输出 schema 3 `assessment.json`（严重级别、类别、对象路径、复核命令、修复建议、规则覆盖） |
 | `internal/bootstrap` | YAML/.env/进程环境/CLI 分层、typed request、清单、凭据与依赖组合；复用 Connector 的库存配置 decoder |
 | `internal/workflow` | 批量采集、离线 review；接收明确字段与能力，返回状态、事件与摘要 |
 | `internal/workflow/apply` | 单项执行状态机；写前 intent、ack、回读、独立清理、uncertain 收尾 |
@@ -33,7 +34,7 @@ flowchart LR
   NXOS --> Parser[parser]
   NXOS --> Config[configuration]
   Workflow --> Collect[collect]
-  Workflow --> Review[review]
+  Workflow --> Rules[rules]
   Workflow --> Change[change]
   Workflow --> Report[report]
   Collect --> Parser
@@ -45,7 +46,7 @@ flowchart LR
   Report --> Evidence
 ```
 
-`review.QueryCatalog` 由选定的 `parser.Profile` 满足：`Command(dimension)` 提供采集查询，`VerificationCommands(scope)` 提供按业务用途声明的核查序列。`ReviewFabric(documents, policy, queries)` 使用 `fabric` 核查序列，声明在 `vendors/nxos` 的 `ProfileSpec.Verification` 内；保留原有配置、VNI、各 VRF IP 接口三条命令。核查命令不增加采集维度，也不绑定虚构的解析器。缺少 Fabric 核查序列时保留诊断，但建议保持 blocked，不产生可执行增量。review 不导入厂商解析器，也不自行拼接替代命令。
+`workflow.Queries` 由选定的 `parser.Profile` 满足：`Command(dimension)` 提供采集查询，`VerificationCommands(scope)` 提供按业务用途声明的核查序列（`fabric` 序列声明在 `vendors/nxos` 的 `ProfileSpec.Verification`）。核查命令不增加采集维度；缺少 Fabric 核查序列时仍报告风险，但不推导可执行增量。`rules` 不导入厂商解析器，也不拼接替代命令。
 
 `configuration.ReviewOrdered` 接受来源中的 VRF 顺序，使 NX-OS 解析器保留既有 JSON 数组顺序；普通映射消费者使用排序后的 `configuration.Review`。根证据包只验证结构，不反向依赖 configuration。
 
@@ -71,4 +72,33 @@ apply 的可变执行事实由私有 `executionState` 持有：状态、pending 
 
 `python3 scripts/check-architecture.py` 使用 `go list -json` 的生产导入图，规则覆盖包及其子包：禁止公开 cli、根证据反向依赖、parser 引入 vendor、collect 自选传输、configuration/change 反向依赖，以及业务层直接引入文件/网络/终端库。领域/根包也检查传递依赖，不能通过 helper 隐藏应用或传输反向依赖；标准库 I/O 只检查直接导入，避免误判 fmt 等基础库。workflow 按直接能力边界禁止依赖 bootstrap、CLI、Cobra 或 Connector/Expect。`scripts/test_architecture.py` 用真实临时 Go 包图覆盖禁止、允许及 helper 绕过样例。CI 和独立交付检查都运行门禁与规则测试。
 
-共享 inventory/config 与回执 API 来自正式 Connector v0.6.0；Expect 固定为 v0.5.0。默认构建与独立交付检查使用 `GOWORK=off`，不恢复本地依赖快照。仓库只维护当前架构、迁移与验证文档，旧实施计划及依赖来源记录通过 Git 历史查询。
+共享 inventory/config 与回执 API 来自正式 Connector v0.7.1；Expect 固定为 v0.6.0。默认构建与独立交付检查使用 `GOWORK=off`，不恢复本地依赖快照。仓库只维护当前架构、迁移与验证文档，旧实施计划及依赖来源记录通过 Git 历史查询。
+
+## 类型化评估（schema 3）
+
+`review` 发布 `assessment.json`、`plan.json`（schema 3，仅 `changes` 与设备条目；执行计划同时接受 schema 2 旧计划）、设备报告、候选脚本与摘要，并在 `summary.json` 中给出 `risk_counts`、`risk_highest` 与 `assessment_incomplete`。评估链路为：设备报告 → `fabric.DecodeDocument` → `fabric.Build`（按 Fabric 策略分配角色）→ `rules.Assessor`（两个 go-netops 引擎，一份规则策略）。
+
+- 证据门禁由引擎统一执行：声明 `Requires` 的规则在证据不完整时记为 `skipped: insufficient_evidence`。运行态状态规则（NVE/BGP/OSPF/vPC/port-channel）从部分表中也会报告已观测到的故障，并在发现项中注明证据状态；`evidence_incomplete` 单独说明无法证明其余部分。
+- 跨设备规则仅在全部声明成员的配置完整时运行，否则只产出 `vxlan.fabric_evidence_incomplete`，避免以部分成员的多数值误判离群设备。一致性规则使用 `drift.Consensus` 指出偏离多数的具体设备；无多数时全部标为 ambiguous。
+- NVE/EVPN 关联修复属于人工脚本（`remediation.status: manual`），不进入自动执行白名单；自动执行仍仅 `svi_acl`、`svi_gateway_add`、`vlan_vni_add`。
+- `--rules-policy FILE` 以 YAML 启用/禁用规则、覆盖严重级别和阈值；未知规则名或参数类型错误直接拒绝。
+
+旧审查（`review` 包与 `ChangePlan`）已下线：全部检查、可执行增量推导与执行校验由类型化实现承担。下线前的逐项等价性（金样、7425 次变异差分、真实配置上 55 个计划逐字节一致）已冻结为 `testdata/typed/` 金样，测试持续回放。
+
+## 基线与变化
+
+- `vxlan baseline --batch DIR --fabric-policy FILE [--output FILE]` 由各 Fabric 当前多数值生成基线草案（Anycast 网关 MAC、SVI MTU、NVE、业务 VNI→VLAN、管理平面服务器）。多数值不等于正确值：草案须人工审核、删减后冻结；输出文件 0600 且不覆盖已有文件。
+- `review --baseline FILE` 以 `vxlan.baseline_*` 规则报告偏离声明意图的配置（类别 `drift`）。与成员一致性不同，全体成员一致但偏离基线同样报告。未声明字段不检查；`defaults` 与 `fabrics.<名称>` 按字段覆盖。
+- `review --previous DIR` 以 `vxlan.change_*` 规则逐设备比较两批证据：配置摘要、业务 VNI/VLAN、Up 的 NVE peer、已建立的 BGP 会话、FULL 的 OSPF 邻居、vPC 状态。任一侧证据不完整的维度不推断变化；仅出现在一批中的设备列入 `appeared` / `disappeared`，消失设备使评估标记为不完整。
+
+## 运维配置扩展
+
+`vendors/nxos` 的只读提取在配置记录中增加 `operations`：NTP/日志/TACACS/SNMP 服务器（不含密钥与 community）、NVE infra VLAN、VLAN 名称、trunk 放行列表、SVI DHCP 中继、fabric 端口与 vPC 域选项。提取不改变行状态与既有字段，Ruby 金样比较时剔除该字段。
+
+`VXLAN_REAL_CORPUS=<目录>` 启用真实配置回归（`fabric/realcorpus_test.go`、`rules/realcorpus_test.go`）：全部配置须完整解析并无损建模，类型化规则须与旧审查逐项一致，派生基线须可往返，同批自比较须无变化。测试只输出聚合统计，设备数据不进入仓库。
+
+## 可执行增量（类型化）
+
+`change` 中的 `SVIGateway`、`VLANVNI`、`SVIACL` 实现 go-netops `change.Change` 与 `Preserving`：命令、回退、准入（Eligible）、回读（Satisfied）与"除目标外配置未变"（Preserved）均与旧 `ChangePlan` 一致。`rules.Increments` 复现旧 Fabric 审查的增量推导（网关、ACL、缺失 VLAN 映射；承载冲突、网段冲突、角色冲突与缺少验证命令时不推导），审查流程据此生成 `plan.json` 的 `changes`，计划 ID、字段与执行计划校验不变；`assessment.json` 以 `vxlan.remediation_increment` 发现项附带候选修复。
+
+类型化模型保留字段存在性：显式 false、空列表/空映射与缺失字段不同，回读保护与旧实现同样严格。等价性由三层测试保证：build/eligible/satisfied 金样；以金样为种子的 7425 次配置变异差分；Fabric 金样与真实配置（`VXLAN_REAL_CORPUS`）上 `plan.json` changes 与旧推导逐字节一致。旧推导保留在测试中作为参照，直至旧审查下线。

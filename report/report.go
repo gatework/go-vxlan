@@ -8,15 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
-	"golang.org/x/sys/unix"
 )
 
+// Report owns publication of one evidence directory.
 type Report struct {
 	Directory     string
 	SyncDirectory func(string) error
@@ -24,6 +27,8 @@ type Report struct {
 	renameFile    func(string, string) error
 	Review        vxlan.Record
 }
+
+// PublishError retains the publication phase and visible-commit boundary.
 type PublishError struct {
 	Relative, Phase string
 	Committed       bool
@@ -33,9 +38,12 @@ type PublishError struct {
 func (e *PublishError) Error() string {
 	return fmt.Sprintf("报告写入失败：%s；阶段 %s；committed=%t", e.Relative, e.Phase, e.Committed)
 }
-func (e *PublishError) Unwrap() error              { return e.cause }
+func (e *PublishError) Unwrap() error { return e.cause }
+
+// PublicationCommitted reports whether publication reached the visible rename boundary.
 func (e *PublishError) PublicationCommitted() bool { return e.Committed }
 
+// SyncDirectory synchronizes a directory without following its final symlink.
 func SyncDirectory(path string) error {
 	fd, e := unix.Open(path, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if e != nil {
@@ -63,12 +71,12 @@ func privateDirectory(path string) error {
 		if e = os.MkdirAll(parent, 0700); e != nil {
 			return e
 		}
-		for i := len(missing) - 1; i >= 0; i-- {
-			real, err := filepath.EvalSymlinks(filepath.Dir(missing[i]))
+		for _, m := range slices.Backward(missing) {
+			resolved, err := filepath.EvalSymlinks(filepath.Dir(m))
 			if err != nil {
 				return err
 			}
-			if e = SyncDirectory(real); e != nil {
+			if e = SyncDirectory(resolved); e != nil {
 				return e
 			}
 		}
@@ -88,6 +96,8 @@ func privateDirectory(path string) error {
 	}
 	return nil
 }
+
+// New creates a private report directory and publication owner.
 func New(root string) (*Report, error) {
 	root, e := filepath.Abs(root)
 	if e != nil {
@@ -116,6 +126,8 @@ func New(root string) (*Report, error) {
 		return &Report{Directory: dir, SyncDirectory: SyncDirectory}, nil
 	}
 }
+
+// Publish durably publishes bytes beneath the report directory.
 func (r *Report) Publish(ctx context.Context, relative string, body []byte) (err error) {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -170,6 +182,8 @@ func (r *Report) Publish(ctx context.Context, relative string, body []byte) (err
 	phase = "directory_sync"
 	return r.SyncDirectory(dir)
 }
+
+// EncodeJSON encodes owned report evidence with a trailing newline.
 func EncodeJSON(v any) ([]byte, error) {
 	// A wrapper allows the same checked projection for scalar/text report fields.
 	projected, err := vxlan.ProjectRecord(vxlan.Record{"value": v})
@@ -182,6 +196,8 @@ func EncodeJSON(v any) ([]byte, error) {
 	}
 	return append(b, '\n'), nil
 }
+
+// PublishJSON encodes and publishes JSON evidence.
 func (r *Report) PublishJSON(ctx context.Context, relative string, value any) error {
 	body, err := EncodeJSON(value)
 	if err != nil {
@@ -189,6 +205,8 @@ func (r *Report) PublishJSON(ctx context.Context, relative string, value any) er
 	}
 	return r.Publish(ctx, relative, body)
 }
+
+// Basename returns the stable device report basename.
 func Basename(d vxlan.Record) string {
 	clean := func(s string) string { return regexp.MustCompile(`[^A-Za-z0-9_.-]`).ReplaceAllString(s, "_") }
 	name := clean(record.String(d["name"]))
@@ -197,6 +215,8 @@ func Basename(d vxlan.Record) string {
 	}
 	return name + "-" + clean(record.String(d["host"]))
 }
+
+// Finish publishes the collection summary with retained device and failure evidence.
 func (r *Report) Finish(ctx context.Context, results []vxlan.Record, requested []any, interrupted bool, failures vxlan.Record) (vxlan.Record, error) {
 	results = append([]vxlan.Record{}, results...)
 	sort.SliceStable(results, func(i, j int) bool {
@@ -240,12 +260,13 @@ func (r *Report) Finish(ctx context.Context, results []vxlan.Record, requested [
 		r.Invalidate()
 		return s, e
 	}
-	text := fmt.Sprintf("VXLAN 证据：%s；完成 %d 台\n证据完整性不代表 Fabric 健康。\n逐设备诊断：devices/；报告状态以 summary.json 为准。\n", status, len(results))
+	var text strings.Builder
+	fmt.Fprintf(&text, "VXLAN 证据：%s；完成 %d 台\n证据完整性不代表 Fabric 健康。\n逐设备诊断：devices/；报告状态以 summary.json 为准。\n", status, len(results))
 	for _, res := range results {
 		d := record.Map(res["device"])
-		text += fmt.Sprintf("%s\t%s\t%s\t保存确认=%v\n", d["host"], d["name"], res["status"], res["report_saved"])
+		fmt.Fprintf(&text, "%s\t%s\t%s\t保存确认=%v\n", d["host"], d["name"], res["status"], res["report_saved"])
 	}
-	if e := r.Publish(ctx, "summary.txt", []byte(text)); e != nil {
+	if e := r.Publish(ctx, "summary.txt", []byte(text.String())); e != nil {
 		return s, e
 	}
 	if e := r.PublishJSON(ctx, "summary.json", s); e != nil {
@@ -259,6 +280,8 @@ func (r *Report) Finish(ctx context.Context, results []vxlan.Record, requested [
 	}
 	return s, nil
 }
+
+// Invalidate removes success markers when final publication cannot be confirmed.
 func (r *Report) Invalidate() {
 	p := filepath.Join(r.Directory, "summary.json")
 	b, e := os.ReadFile(p)

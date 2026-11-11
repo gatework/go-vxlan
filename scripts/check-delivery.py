@@ -9,8 +9,9 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEPENDENCIES = {
-    "github.com/gatework/go-net-connector": "v0.6.0",
-    "github.com/gatework/go-expect": "v0.5.0",
+    "github.com/gatework/go-net-connector": "v0.7.1",
+    "github.com/gatework/go-expect": "v0.6.0",
+    "github.com/gatework/go-netops": "v0.3.0",
 }
 
 
@@ -73,7 +74,8 @@ def main():
             '_ "github.com/gatework/go-vxlan/collect"; '
             '_ "github.com/gatework/go-vxlan/configuration"; '
             '_ "github.com/gatework/go-vxlan/change"; '
-            '_ "github.com/gatework/go-vxlan/review")\n'
+            '_ "github.com/gatework/go-vxlan/fabric"; '
+            '_ "github.com/gatework/go-vxlan/rules")\n'
             'func main(){o,e:=nxos.ParseConfigChecked("hostname LEAF\\n",true);'
             'if e!=nil||!o.Complete(){panic("parse failed")};fmt.Println(o)}\n'
         )

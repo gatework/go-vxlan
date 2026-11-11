@@ -18,6 +18,7 @@ import (
 // and unvisited source. Merely reading a line does not mean it was parsed.
 type LineState string
 
+// Source line classification states.
 const (
 	LinePending     LineState = "pending"
 	LineParsed      LineState = "parsed"
@@ -29,8 +30,11 @@ const (
 // ConfigurationParser retains the last successful input's source document.
 // Each Parse creates an independent snapshot; invalid input clears Document.
 // A parser instance must not be used concurrently.
+//
+//nolint:recvcheck // Value-formatting methods intentionally redact values and pointers consistently.
 type ConfigurationParser struct{ document *ConfigurationDocument }
 
+// Parse validates input and retains the parsed source document.
 func (p *ConfigurationParser) Parse(text string, complete bool) (vxlan.Observation, error) {
 	p.document = nil
 	if err := validateConfigInput(text); err != nil {
@@ -41,11 +45,17 @@ func (p *ConfigurationParser) Parse(text string, complete bool) (vxlan.Observati
 	p.document = d
 	return o, nil
 }
+
+// Document returns the most recently parsed source document.
 func (p *ConfigurationParser) Document() *ConfigurationDocument { return p.document }
 func (p ConfigurationParser) String() string {
 	return fmt.Sprintf("ConfigurationParser{document=%t}", p.document != nil)
 }
+
+// GoString returns diagnostic metadata without configuration payloads.
 func (p ConfigurationParser) GoString() string { return p.String() }
+
+// MarshalJSON encodes metadata without exposing configuration text.
 func (p ConfigurationParser) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Document *ConfigurationDocument `json:"document"`
@@ -73,6 +83,8 @@ func validateConfigInput(text string) error {
 // ConfigurationDocument is an immutable source snapshot. Content and the
 // explicit source accessors reveal configuration text; formatting and JSON
 // only expose metadata. Returned slices and captured data are independent copies.
+//
+//nolint:recvcheck // Value-formatting methods intentionally redact values and pointers consistently.
 type ConfigurationDocument struct {
 	content  string
 	checksum string
@@ -103,12 +115,26 @@ func newConfigurationDocument(text string) *ConfigurationDocument {
 	}
 	return d
 }
-func (d *ConfigurationDocument) Content() string     { return d.content }
-func (d *ConfigurationDocument) Checksum() string    { return d.checksum }
-func (d *ConfigurationDocument) Size() int           { return len(d.lines) }
-func (d *ConfigurationDocument) Position() int       { return d.Size() }
-func (d *ConfigurationDocument) EOF() bool           { return true }
+
+// Content returns the explicit original configuration text.
+func (d *ConfigurationDocument) Content() string { return d.content }
+
+// Checksum returns the SHA256 digest of the original source bytes.
+func (d *ConfigurationDocument) Checksum() string { return d.checksum }
+
+// Size returns the number of source lines.
+func (d *ConfigurationDocument) Size() int { return len(d.lines) }
+
+// Position returns the completed parser position.
+func (d *ConfigurationDocument) Position() int { return d.Size() }
+
+// EOF reports whether the source traversal reached its end.
+func (d *ConfigurationDocument) EOF() bool { return true }
+
+// Lines returns a detached list of source lines.
 func (d *ConfigurationDocument) Lines() []SourceLine { return append([]SourceLine{}, d.lines...) }
+
+// States returns a detached list of line classification states.
 func (d *ConfigurationDocument) States() []LineState { return append([]LineState{}, d.states...) }
 
 // State uses a zero-based line index and returns an error outside the document.
@@ -118,11 +144,19 @@ func (d *ConfigurationDocument) State(index int) (LineState, error) {
 	}
 	return d.states[index], nil
 }
+
+// Visited reports whether the line index lies within the parsed document.
 func (d *ConfigurationDocument) Visited(index int) bool { return index >= 0 && index < d.Size() }
+
+// Parsed reports whether the line was classified as parsed.
 func (d *ConfigurationDocument) Parsed(index int) bool {
 	return index >= 0 && index < d.Size() && d.states[index] == LineParsed
 }
+
+// Roots returns detached top-level source block metadata.
 func (d *ConfigurationDocument) Roots() []SourceBlock { return append([]SourceBlock{}, d.roots...) }
+
+// Captures returns detached captured values and source associations.
 func (d *ConfigurationDocument) Captures() []SourceCapture {
 	return append([]SourceCapture{}, d.captures...)
 }
@@ -138,6 +172,8 @@ func (d *ConfigurationDocument) CapturesFor(path ...any) []SourceCapture {
 	}
 	return out
 }
+
+// UnparsedLines returns source lines with no accepted classification.
 func (d *ConfigurationDocument) UnparsedLines() []SourceLine {
 	out := []SourceLine{}
 	for i, l := range d.lines {
@@ -147,6 +183,8 @@ func (d *ConfigurationDocument) UnparsedLines() []SourceLine {
 	}
 	return out
 }
+
+// UnparsedContent joins the source text of unparsed lines.
 func (d *ConfigurationDocument) UnparsedContent() string {
 	var b strings.Builder
 	for _, l := range d.UnparsedLines() {
@@ -154,6 +192,8 @@ func (d *ConfigurationDocument) UnparsedContent() string {
 	}
 	return b.String()
 }
+
+// Complete reports whether every relevant source line was accepted.
 func (d *ConfigurationDocument) Complete() bool {
 	for _, s := range d.states {
 		if !resolvedLine(s) {
@@ -165,7 +205,11 @@ func (d *ConfigurationDocument) Complete() bool {
 func (d ConfigurationDocument) String() string {
 	return fmt.Sprintf("ConfigurationDocument{lines=%d captures=%d}", d.Size(), len(d.captures))
 }
+
+// GoString returns diagnostic metadata without configuration payloads.
 func (d ConfigurationDocument) GoString() string { return d.String() }
+
+// MarshalJSON encodes metadata without exposing configuration text.
 func (d ConfigurationDocument) MarshalJSON() ([]byte, error) {
 	counts := map[LineState]int{}
 	for _, s := range d.states {
@@ -181,13 +225,26 @@ type SourceLine struct {
 	raw           string
 }
 
-func (l SourceLine) Index() int       { return l.index }
-func (l SourceLine) Number() int      { return l.index + 1 }
-func (l SourceLine) Indent() int      { return l.indent }
-func (l SourceLine) Content() string  { return l.raw }
-func (l SourceLine) Text() string     { return strings.Trim(l.raw, " \t\r\n\v\f") }
-func (l SourceLine) String() string   { return fmt.Sprintf("SourceLine{number=%d}", l.Number()) }
+// Index returns the zero-based source line index.
+func (l SourceLine) Index() int { return l.index }
+
+// Number returns the one-based source line number.
+func (l SourceLine) Number() int { return l.index + 1 }
+
+// Indent returns the source indentation width.
+func (l SourceLine) Indent() int { return l.indent }
+
+// Content returns the explicit original configuration text.
+func (l SourceLine) Content() string { return l.raw }
+
+// Text returns the trimmed source text.
+func (l SourceLine) Text() string   { return strings.Trim(l.raw, " \t\r\n\v\f") }
+func (l SourceLine) String() string { return fmt.Sprintf("SourceLine{number=%d}", l.Number()) }
+
+// GoString returns diagnostic metadata without configuration payloads.
 func (l SourceLine) GoString() string { return l.String() }
+
+// MarshalJSON encodes metadata without exposing configuration text.
 func (l SourceLine) MarshalJSON() ([]byte, error) {
 	return json.Marshal(vxlan.Record{"number": l.Number()})
 }
@@ -200,18 +257,35 @@ type SourceBlock struct {
 	children    []SourceBlock
 }
 
-func (b SourceBlock) Index() int              { return b.index }
-func (b SourceBlock) Line() int               { return b.index + 1 }
-func (b SourceBlock) LineRange() (int, int)   { return b.Line(), b.last + 1 }
-func (b SourceBlock) Header() SourceLine      { return b.document.lines[b.index] }
-func (b SourceBlock) Text() string            { return b.Header().Text() }
+// Index returns the zero-based source line index.
+func (b SourceBlock) Index() int { return b.index }
+
+// Line returns the one-based starting line number.
+func (b SourceBlock) Line() int { return b.index + 1 }
+
+// LineRange returns inclusive one-based source line boundaries.
+func (b SourceBlock) LineRange() (int, int) { return b.Line(), b.last + 1 }
+
+// Header returns the block header source line.
+func (b SourceBlock) Header() SourceLine { return b.document.lines[b.index] }
+
+// Text returns the trimmed source text.
+func (b SourceBlock) Text() string { return b.Header().Text() }
+
+// Children returns a detached list of nested blocks.
 func (b SourceBlock) Children() []SourceBlock { return append([]SourceBlock{}, b.children...) }
+
+// Lines returns a detached list of source lines.
 func (b SourceBlock) Lines() []SourceLine {
 	return append([]SourceLine{}, b.document.lines[b.index:b.last+1]...)
 }
+
+// States returns a detached list of line classification states.
 func (b SourceBlock) States() []LineState {
 	return append([]LineState{}, b.document.states[b.index:b.last+1]...)
 }
+
+// Content returns the explicit original configuration text.
 func (b SourceBlock) Content() string {
 	var out strings.Builder
 	for _, l := range b.document.lines[b.index : b.last+1] {
@@ -219,6 +293,8 @@ func (b SourceBlock) Content() string {
 	}
 	return out.String()
 }
+
+// Complete reports whether every relevant source line was accepted.
 func (b SourceBlock) Complete() bool {
 	for _, s := range b.document.states[b.index : b.last+1] {
 		if !resolvedLine(s) {
@@ -230,7 +306,11 @@ func (b SourceBlock) Complete() bool {
 func (b SourceBlock) String() string {
 	return fmt.Sprintf("SourceBlock{lines=%d..%d children=%d}", b.Line(), b.last+1, len(b.children))
 }
+
+// GoString returns diagnostic metadata without configuration payloads.
 func (b SourceBlock) GoString() string { return b.String() }
+
+// MarshalJSON encodes metadata without exposing configuration text.
 func (b SourceBlock) MarshalJSON() ([]byte, error) {
 	return json.Marshal(vxlan.Record{"first_line": b.Line(), "last_line": b.last + 1, "children": len(b.children)})
 }
@@ -243,16 +323,31 @@ type SourceCapture struct {
 	data  any
 }
 
-func (c SourceCapture) Block() SourceBlock    { return c.block }
-func (c SourceCapture) Path() []any           { return append([]any{}, c.path...) }
-func (c SourceCapture) Data() any             { return record.Copy(c.data) }
-func (c SourceCapture) Content() string       { return c.block.Content() }
-func (c SourceCapture) Complete() bool        { return c.block.Complete() }
+// Block returns the source block owning the captured value.
+func (c SourceCapture) Block() SourceBlock { return c.block }
+
+// Path returns a detached path into the projected configuration.
+func (c SourceCapture) Path() []any { return append([]any{}, c.path...) }
+
+// Data returns a detached captured value.
+func (c SourceCapture) Data() any { return record.Copy(c.data) }
+
+// Content returns the explicit original configuration text.
+func (c SourceCapture) Content() string { return c.block.Content() }
+
+// Complete reports whether every relevant source line was accepted.
+func (c SourceCapture) Complete() bool { return c.block.Complete() }
+
+// LineRange returns inclusive one-based source line boundaries.
 func (c SourceCapture) LineRange() (int, int) { return c.block.LineRange() }
 func (c SourceCapture) String() string {
 	return fmt.Sprintf("SourceCapture{lines=%d..%d}", c.block.Line(), c.block.last+1)
 }
+
+// GoString returns diagnostic metadata without configuration payloads.
 func (c SourceCapture) GoString() string { return c.String() }
+
+// MarshalJSON encodes metadata without exposing configuration text.
 func (c SourceCapture) MarshalJSON() ([]byte, error) {
 	return json.Marshal(vxlan.Record{"first_line": c.block.Line(), "last_line": c.block.last + 1, "complete": c.Complete()})
 }

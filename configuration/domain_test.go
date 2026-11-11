@@ -8,11 +8,8 @@ import (
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/change"
-	"github.com/gatework/go-vxlan/configuration"
+	"github.com/gatework/go-vxlan/fabric"
 	"github.com/gatework/go-vxlan/internal/record"
-	"github.com/gatework/go-vxlan/review"
-	"github.com/gatework/go-vxlan/vendors"
 )
 
 func TestDomainRubyCorpus(t *testing.T) {
@@ -39,36 +36,18 @@ func TestDomainRubyCorpus(t *testing.T) {
 			var got any
 			var callErr error
 			switch row.Name {
-			case "recommendations":
-				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
-				got = review.Recommendations(record.Map(in["document"]), profile)
-			case "fabric":
-				profile, _ := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
-				got, callErr = review.ReviewFabric(record.Rows(in["documents"]), record.Map(in["policy"]), profile)
-			case "combine":
-				got = review.CombineRecommendations(record.Map(in["advice"]), record.Rows(in["additions"]))
-			case "build":
-				var p *change.ChangePlan
-				p, callErr = change.NewChangePlan(record.Map(in["change"]))
-				if p != nil {
-					got = vxlan.Record{"change": p.Change(), "commands": p.Commands(), "rollback": p.Rollback()}
-				}
-			case "eligible", "satisfied":
-				p, e := change.NewChangePlan(record.Map(in["change"]))
-				callErr = e
-				if p != nil {
-					if row.Name == "eligible" {
-						got = p.Eligible(record.Map(in["config"]))
-					} else {
-						got = p.Satisfied(record.Map(in["after"]), record.Map(in["before"]))
-					}
-				}
-			case "catalog":
-				got = configuration.ServiceCatalog(record.Map(in["configs"]))
-			case "route_targets":
-				got = configuration.ServiceRouteTargets(in["entries"], in["asn"], in["vni"])
+			case "recommendations", "fabric", "combine", "build", "eligible", "satisfied":
+				// Typed parity tests in rules/ and change/ replay these cases;
+				// the legacy review and ChangePlan they described are retired.
+				return
+			case "catalog", "route_targets", "subnets", "acl_rules", "acl_policy":
+				// Typed equivalents in fabric/ and rules/ replay these cases.
+				return
+			case "bgp_neighbors", "prefix_references":
+				// Retired: no rule consumes these relations.
+				return
 			case "scope":
-				callErr = review.ValidateFabricPolicy(record.Map(in["policy"]))
+				callErr = fabric.ValidatePolicyDocument(in["policy"])
 				if callErr == nil {
 					g := vxlan.Record{}
 					for name, value := range record.Map(record.Map(in["policy"])["fabrics"]) {
@@ -80,22 +59,8 @@ func TestDomainRubyCorpus(t *testing.T) {
 					}
 					got = g
 				}
-			case "subnets":
-				got, callErr = configuration.NewSubnetIndex(record.Map(in["config"])).Conflicts(record.String(in["address"]), in["vrf"], in["vni"], record.String(in["except_interface"]))
-			case "bgp_neighbors":
-				tuples := []any{}
-				for _, n := range configuration.BGPNeighbors(record.Map(in["bgp"])) {
-					tuples = append(tuples, []any{n["vrf"], n["peer"], n["settings"]})
-				}
-				got = tuples
 			case "fingerprint":
 				got, callErr = vxlan.Fingerprint(in["value"])
-			case "acl_rules":
-				got = configuration.ACLRules(in["entries"])
-			case "acl_policy":
-				got = configuration.ResolveACLPolicy(record.Map(in["config"]), in["entries"])
-			case "prefix_references":
-				got, callErr = configuration.PrefixListReferences(record.Map(in["config"]), in["family"].(string))
 			default:
 				t.Fatalf("unknown case %s", row.Name)
 			}

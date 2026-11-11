@@ -73,43 +73,9 @@ func NewRegistry(specs map[string]ProfileSpec) (*Registry, error) {
 		if _, ok := r.profiles[key]; ok {
 			return nil, fmt.Errorf("duplicate platform")
 		}
-		p := Profile{
-			preparation: slices.Clone(s.Preparation), absentReason: s.AbsentReason,
-			commands:     make(map[string]string, len(s.Queries)),
-			verification: make(map[string][]string, len(s.Verification)),
-			parsers:      make(map[string]ParseFunc, len(s.Queries)),
-		}
-		if len(s.Queries) == 0 {
-			return nil, fmt.Errorf("empty query declarations")
-		}
-		commands := map[string]bool{}
-		for _, q := range s.Queries {
-			if strings.TrimSpace(q.Dimension) == "" || !validCommand(q.Command) || q.Parse == nil {
-				return nil, fmt.Errorf("invalid query declaration")
-			}
-			if p.commands[q.Dimension] != "" || commands[q.Command] {
-				return nil, fmt.Errorf("duplicate query declaration")
-			}
-			commands[q.Command] = true
-			p.queries = append(p.queries, Query{Dimension: q.Dimension, Command: q.Command})
-			p.commands[q.Dimension] = q.Command
-			p.parsers[q.Dimension] = q.Parse
-		}
-		for _, command := range p.preparation {
-			if !validCommand(command) {
-				return nil, fmt.Errorf("invalid preparation command")
-			}
-		}
-		for scope, commands := range s.Verification {
-			if strings.TrimSpace(scope) == "" || len(commands) == 0 {
-				return nil, fmt.Errorf("invalid verification scope")
-			}
-			for _, command := range commands {
-				if !validCommand(command) {
-					return nil, fmt.Errorf("invalid verification command")
-				}
-			}
-			p.verification[scope] = slices.Clone(commands)
+		p, err := queryProfile(s)
+		if err != nil {
+			return nil, err
 		}
 		d := profileDefinition{profile: p, modelParsers: map[string]map[string]ParseFunc{}}
 		for model, overrides := range s.ModelParsers {
@@ -156,7 +122,10 @@ func (r *Registry) Fetch(platform, model string) (*Profile, error) {
 	return &p, nil
 }
 
+// Queries returns a detached copy of the configured queries.
 func (p *Profile) Queries() []Query { return slices.Clone(p.queries) }
+
+// Dimensions returns the profile dimension names.
 func (p *Profile) Dimensions() []string {
 	names := make([]string, len(p.queries))
 	for i, q := range p.queries {
@@ -164,8 +133,12 @@ func (p *Profile) Dimensions() []string {
 	}
 	return names
 }
+
+// Commands returns a detached command map.
 func (p *Profile) Commands() map[string]string { return maps.Clone(p.commands) }
-func (p *Profile) Command(name string) string  { return p.commands[name] }
+
+// Command returns the command for the named dimension.
+func (p *Profile) Command(name string) string { return p.commands[name] }
 
 // VerificationCommands returns review-only commands for a business scope.
 // They do not add collection dimensions or command parsers.
@@ -173,7 +146,10 @@ func (p *Profile) VerificationCommands(scope string) []string {
 	return slices.Clone(p.verification[scope])
 }
 
+// PreparationCommands returns a detached list of preparation commands.
 func (p *Profile) PreparationCommands() []string { return slices.Clone(p.preparation) }
+
+// AbsentReason classifies an absent dimension using the configuration evidence.
 func (p *Profile) AbsentReason(name string, configuration vxlan.Observation, beforeQuery bool) string {
 	if p.absentReason == nil {
 		return ""
@@ -202,4 +178,46 @@ func (p *Profile) Parse(name, text string, complete bool) (vxlan.Observation, er
 		owned.CompletedAt = new(*o.CompletedAt)
 	}
 	return owned, err
+}
+
+func queryProfile(s ProfileSpec) (Profile, error) {
+	p := Profile{
+		preparation: slices.Clone(s.Preparation), absentReason: s.AbsentReason,
+		commands:     make(map[string]string, len(s.Queries)),
+		verification: make(map[string][]string, len(s.Verification)),
+		parsers:      make(map[string]ParseFunc, len(s.Queries)),
+	}
+	if len(s.Queries) == 0 {
+		return Profile{}, fmt.Errorf("empty query declarations")
+	}
+	commands := map[string]bool{}
+	for _, q := range s.Queries {
+		if strings.TrimSpace(q.Dimension) == "" || !validCommand(q.Command) || q.Parse == nil {
+			return Profile{}, fmt.Errorf("invalid query declaration")
+		}
+		if p.commands[q.Dimension] != "" || commands[q.Command] {
+			return Profile{}, fmt.Errorf("duplicate query declaration")
+		}
+		commands[q.Command] = true
+		p.queries = append(p.queries, Query{Dimension: q.Dimension, Command: q.Command})
+		p.commands[q.Dimension] = q.Command
+		p.parsers[q.Dimension] = q.Parse
+	}
+	for _, command := range p.preparation {
+		if !validCommand(command) {
+			return Profile{}, fmt.Errorf("invalid preparation command")
+		}
+	}
+	for scope, commands := range s.Verification {
+		if strings.TrimSpace(scope) == "" || len(commands) == 0 {
+			return Profile{}, fmt.Errorf("invalid verification scope")
+		}
+		for _, command := range commands {
+			if !validCommand(command) {
+				return Profile{}, fmt.Errorf("invalid verification command")
+			}
+		}
+		p.verification[scope] = slices.Clone(commands)
+	}
+	return p, nil
 }

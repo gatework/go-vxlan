@@ -1,0 +1,623 @@
+{
+ "03ce8fae965c4e22c74dfbc34ae18a445a320d95fd9544e02a3733d24f700bd2.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--e2bc578b01f9": {
+    "change": {
+     "acl": "protect",
+     "address_groups": {},
+     "create_acl": true,
+     "direction": "out",
+     "entries": [
+      {
+       "action": "deny",
+       "expression": "ip any 192.0.2.0/24",
+       "sequence": 10
+      },
+      {
+       "action": "permit",
+       "expression": "ip any any",
+       "sequence": 20
+      }
+     ],
+     "kind": "svi_acl",
+     "previous_binding": "protect",
+     "vlan": 8,
+     "vni": 10008
+    },
+    "commands": [
+     "configure terminal",
+     "ip access-list protect",
+     "  10 deny ip any 192.0.2.0/24",
+     "  20 permit ip any any",
+     "exit",
+     "interface Vlan8",
+     "  ip access-group protect out",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "a94d1710197e8610a0be74101ab3f3f6c3633036b66ba96bfa993214c0bd26d3",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+     "依据是本业务已挂载且有序内容一致的 ACL；即使挂载节点较少，也不以无 ACL 的多数节点为删除依据。确认此业务应统一受该 ACL 保护。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "no ip access-list protect",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "e0ae52263ffd2730cd19c627bce647d9cdc9c589cd9b21b18326252f0b94fd3d",
+    "title": "统一 out 方向访问控制",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--e2bc578b01f9"
+   ]
+  }
+ },
+ "06fdcc298e01a3fb0b77c292511ce29bd8561bdc7ada236e32f0f463b06389d7.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "0eca0c4c598bfcb62932c5782dfa53983b2026113742911bd54122042474d9bc.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "1138aa0469f6556b976454c1d8e59abc71408022dfb2f73362d8ef56cb1d68d4.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "1b08c6f721546616171d0ec0383d5453668ca7277d75b59a7f2e9331fb3db4a2.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "1cedfb648adab3e59c107f23d55f19c15d24d97385ae5939426fcd2f43cd164c.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "200429a7ddccf807e59962ffacb864d474b7d8da64665fb7e7c06a704b50863d.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "2253ec2fafa96b5cc96e7ead133633c690d5ab5dc55cf16b910a90e4efe99ee5.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "225cba9a99b4cedb80ebabd51ec61589bf0c6beb9ce63f41596f1e84d3ae645a.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "24dc4a8922e8d9dd445ad4aa47716a7d4ddf97fc4913a9a41a990b01b6a537ca.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "2c2583578e3d08984f4c6bdc0479cbdd3a7214135efbe7d9c0ea9031964a0808.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "3157d40e78b03d7246c175e18cccea8706a0663de22d8d674fe5d253f8ea2ae2.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "40989106152ee67d48e291b61571e9050e877938efc5a1162ec23fd44df23d4b.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "4ec81c7817983aae8f5c5c707c1f8207ef76758d3ba1c1f20ee2ff733824a0b0.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "5469f77430dce4a10da83d9aab8b43050a531420cbb70e333363343c417c2c46.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326": {
+    "change": {
+     "address": "192.0.2.254/24",
+     "kind": "svi_gateway_add",
+     "vlan": 8,
+     "vni": 10008,
+     "vrf": "tenant"
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip address 192.0.2.254/24",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "c42586a0c43e303e95449f4646fe483709cd7eb030810c783d9b9f52a351b4b4",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip address 192.0.2.254/24",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "d0c2507269ce501df56b73a690dee93b35bc0352b224c5e77787946f1c42b318",
+    "title": "网关地址需要一致",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326"
+   ]
+  }
+ },
+ "54e20c1579661ba188541902b92fd34bc4138c0a9b9a9f78d880d1960ce2a29c.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "594b88b32d90107004a9d67596a7821f8ffd13eb9e035e5783528f331de7e460.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--75986588e06c": {
+    "change": {
+     "acl": "protect",
+     "address_groups": {
+      "admins": [
+       "192.0.2.0/24"
+      ]
+     },
+     "create_acl": false,
+     "direction": "out",
+     "entries": [
+      {
+       "action": "deny",
+       "expression": "ip addrgroup admins any",
+       "sequence": 10
+      },
+      {
+       "action": "permit",
+       "expression": "ip any any",
+       "sequence": 20
+      }
+     ],
+     "kind": "svi_acl",
+     "previous_binding": null,
+     "vlan": 8,
+     "vni": 10008
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip access-group protect out",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "4b91cdc66331b623446ec681f1842b2ae6e549cbc866577943e7ed44d32f6f0e",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+     "依据是本业务已挂载且有序内容一致的 ACL；即使挂载节点较少，也不以无 ACL 的多数节点为删除依据。确认此业务应统一受该 ACL 保护。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip access-group protect out",
+     "exit",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "3c084f7e5892772aa3d402006633223fb071f6290eb177bcc66f5d66772565e7",
+    "title": "统一 out 方向访问控制",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--75986588e06c"
+   ]
+  }
+ },
+ "5dfaf49204f93329582558631a4becde2b04c9e3d3779b2d81828fb6dbc6a5df.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "646b3a0cd4043fe64d23292c95f29cda63eb13cdcf0babc2bb130238886b40eb.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "6ae8bfb00878540f43069d14c73d8feb33bb09769b7467e13477496b7a372ad7.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "6b579b1a791bde78f56df226fac5216c96b99adda336c36c24923bc8e5ca7a24.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "6b79fc7acbf9b1fba71bc5d3b9973c5b6badce71b02d11f776728fcbc145da2a.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--vlan_vni_add--vlan8--c32df842489e": {
+    "change": {
+     "address": "192.0.2.254/24",
+     "kind": "vlan_vni_add",
+     "vlan": 8,
+     "vni": 10008,
+     "vrf": "tenant"
+    },
+    "commands": [
+     "configure terminal",
+     "vlan 8",
+     "  vn-segment 10008",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "7886c794739330da115df03c32a041d1ba964f1cf55f9f1aee2193610e22968c",
+    "impact": "将已有 VLAN 接入既有 VXLAN 业务，可能立即扩展广播域；不创建 VLAN，不更改网关或 ACL。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+     "本机未映射 VLAN 的网关、VRF、Anycast 身份及 ACL 与完整对端一致，NVE/EVPN 也已匹配；确认该业务确应在本机接入。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "vlan 8",
+     "  no vn-segment",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "5b863e26301a99aa61e54839deb59f6d8b4b8f94d44c5f60e9fbebb0df33386d",
+    "title": "补齐已有业务的 VLAN/VNI 关联",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--vlan_vni_add--vlan8--c32df842489e"
+   ]
+  }
+ },
+ "77f1f082bca725d3e962ea10f5713c656feed38d490735b5cd080efc8173a7c1.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "7994b546634d21fbb683d74ec3a61be2dea3897c9760ec12e15574542d1ec203.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "7c1e31b0db9f3b7c93c9c7ed67b26904782afa47c4ede1b6931b92d4cd2d900c.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "9622550c5563c0b1f3d822ab605f5e3d539aff80768ead49b6b17f00dc1a5b33.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--884ec2707804": {
+    "change": {
+     "acl": "protect",
+     "address_groups": {},
+     "create_acl": false,
+     "direction": "out",
+     "entries": [
+      {
+       "action": "deny",
+       "expression": "ip any 192.0.2.0/24",
+       "sequence": 10
+      },
+      {
+       "action": "permit",
+       "expression": "ip any any",
+       "sequence": 20
+      }
+     ],
+     "kind": "svi_acl",
+     "previous_binding": null,
+     "vlan": 8,
+     "vni": 10008
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip access-group protect out",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "79219117365345ee562439b2ae259b13531dfc1e5544bfb8a73497130590fbfa",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+     "依据是本业务已挂载且有序内容一致的 ACL；即使挂载节点较少，也不以无 ACL 的多数节点为删除依据。确认此业务应统一受该 ACL 保护。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip access-group protect out",
+     "exit",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "10fbba42c826c2418165a3e6920961037f87ca7e4304f1b1a77468dcf3454883",
+    "title": "统一 out 方向访问控制",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   },
+   "192.0.2.3-192.0.2.3--svi_acl--vlan8--out--884ec2707804": {
+    "change": {
+     "acl": "protect",
+     "address_groups": {},
+     "create_acl": false,
+     "direction": "out",
+     "entries": [
+      {
+       "action": "deny",
+       "expression": "ip any 192.0.2.0/24",
+       "sequence": 10
+      },
+      {
+       "action": "permit",
+       "expression": "ip any any",
+       "sequence": 20
+      }
+     ],
+     "kind": "svi_acl",
+     "previous_binding": null,
+     "vlan": 8,
+     "vni": 10008
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip access-group protect out",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.3",
+     "name": "192.0.2.3"
+    },
+    "expected_config_sha256": "79219117365345ee562439b2ae259b13531dfc1e5544bfb8a73497130590fbfa",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。",
+     "依据是本业务已挂载且有序内容一致的 ACL；即使挂载节点较少，也不以无 ACL 的多数节点为删除依据。确认此业务应统一受该 ACL 保护。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip access-group protect out",
+     "exit",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "43527287338573196248f955192eab2041ba32ae9d15b3901a33e380ef4f5a6a",
+    "title": "统一 out 方向访问控制",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_acl--vlan8--out--884ec2707804"
+   ],
+   "192.0.2.3-192.0.2.3": [
+    "192.0.2.3-192.0.2.3--svi_acl--vlan8--out--884ec2707804"
+   ]
+  }
+ },
+ "9c9f573cb829f2f79f1f902eaa880620b425d9e305e9be2c20a738f34b3917f2.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "a500cb1e6d589e6df1c86e2a1bebf3302afc6484650e65bd6f8d0fb9ea46eae9.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "a68d40c59b8e3323b347784a2cec48ea8632cf844875b543384347e4a329762c.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "a858b273bba1578644c39538b31c37d2dddceb033a04e6b53764702231428f91.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "a9109db86d4a3e08663ac2d7c68b40bc4c358bc1d8446f3cea6ff20220a63008.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326": {
+    "change": {
+     "address": "192.0.2.254/24",
+     "kind": "svi_gateway_add",
+     "vlan": 8,
+     "vni": 10008,
+     "vrf": "tenant"
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip address 192.0.2.254/24",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "16cff8ad32111a59222b8636fd92a2be1ded652619cabf97888daae79dd6d15d",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip address 192.0.2.254/24",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "dd998a92cc09f82c4ba0a851fe528e8708476a4bb9b73ad4785241ebb1d7a236",
+    "title": "网关地址需要一致",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326"
+   ]
+  }
+ },
+ "bb8ba52a5319bb9b96720306ff930051db65e6f0b124fa6b6fd9ddcc18182e64.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "bbaa362ddae1414c47031349a8821560ddb70fbfa949bcd46d6f55d9fff82579.json": {
+  "changes": {
+   "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326": {
+    "change": {
+     "address": "192.0.2.254/24",
+     "kind": "svi_gateway_add",
+     "vlan": 8,
+     "vni": 10008,
+     "vrf": "tenant"
+    },
+    "commands": [
+     "configure terminal",
+     "interface Vlan8",
+     "  ip address 192.0.2.254/24",
+     "end"
+    ],
+    "device": {
+     "host": "192.0.2.2",
+     "name": "192.0.2.2"
+    },
+    "expected_config_sha256": "de784d2294a2681f010df0f4ea9db1a33fd34dbc64bff664a12076605efa6ad5",
+    "impact": "改变网关或 ACL 可能改变可达性及业务隔离；配置回读通过后仍需业务验收。",
+    "platform": "cisco_nxos",
+    "prerequisites": [
+     "仅在本 Fabric、相同已部署业务范围内适用；核对业务访问策略与维护窗口。",
+     "下发前重新读取配置，任何变化均使计划过期；逐设备逐项确认，不批量重放。"
+    ],
+    "rollback": [
+     "configure terminal",
+     "interface Vlan8",
+     "  no ip address 192.0.2.254/24",
+     "end"
+    ],
+    "schema_version": 1,
+    "scope": "test / leaves / VNI 10008",
+    "source": "fixture.json",
+    "source_sha256": "8854cd6afcd6b99c304253b1b0e886a9901fc438d1282f2f19d9b6d33673bfd4",
+    "title": "网关地址需要一致",
+    "verify": [
+     "show running-config",
+     "show nve vni",
+     "show ip interface brief vrf all"
+    ]
+   }
+  },
+  "plans": {
+   "192.0.2.2-192.0.2.2": [
+    "192.0.2.2-192.0.2.2--svi_gateway_add--vlan8--4d8742130326"
+   ]
+  }
+ },
+ "c67deabf03e2ebd23202da5c4fcbc34557d7ebe4e290bda0e8c9df831cf87105.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "c7560412d5ae04c3c9e98d92b2ec81c05aa3169ba65ef1db6208cca4f9fb7cd7.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "ccfa1ecf09250000261c5f2119dbd08ec2550ea1df0417754f016c5e64eb2971.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "deb961ecf61c7b8c685b771a7dca5d93a79572a5ad4ee53e2466eeffe05c0b45.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "e8d671cb7f21dd544ccb704267195ec7579cb3ca1dc0117ca10da2940b87ba3b.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "eabe6a763ea28fe530a8c931cb7d9900662cd7d281333c92c1e4f1357e740465.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "ee4d99369dcc94841fb5906a5d87e8b52332d772d43e2dbacbcab57214683fbf.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "f07339aa6557ec774738c243410b4566a3daf2cbfd0d697dcfbd60cfa555e436.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "f7f081805992e8da5ee4976d7e62570fe316c60fd4d6351d408f50986973080f.json": {
+  "changes": {},
+  "plans": {}
+ },
+ "fd5f94e7b4a4adf6fa2443013f766754ad88136ba24ac865fa90b5e4eff56239.json": {
+  "changes": {},
+  "plans": {}
+ }
+}

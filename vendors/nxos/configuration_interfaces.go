@@ -62,34 +62,7 @@ func (s *cfgState) nve(b *cfgBlock) vxlan.Record {
 		s.enter(c)
 		t := c.text
 		if m := textparse.Match(`member vni (\d+)(?: (associate-vrf)| mcast-group (\S+))?`, t); m != nil {
-			id := cfgInt(m[1], 1, 16777215)
-			member := vxlan.Record{"associate_vrf": m[2] != ""}
-			if m[3] != "" {
-				member["multicast_group"] = cfgMulticast(m[3])
-			}
-			for _, x := range c.children {
-				s.enter(x)
-				if x.text == "ingress-replication protocol bgp" {
-					member["replication"] = "bgp"
-				} else if g := textparse.Match(`mcast-group (\S+)`, x.text); g != nil {
-					group := cfgMulticast(g[1])
-					if old := member["multicast_group"]; old != nil && old != group {
-						panic("invalid_configuration_value")
-					}
-					member["multicast_group"] = group
-				} else if x.text == "suppress-arp" || x.text == "no suppress-arp" {
-					s.assign(member, "suppress_arp", x.text == "suppress-arp", x)
-				} else {
-					s.issue(x, "unsupported_configuration")
-					continue
-				}
-				s.leaf(x)
-			}
-			s.current = c
-			if member["replication"] == "bgp" && member["multicast_group"] != nil {
-				panic("invalid_configuration_value")
-			}
-			s.store(record.Map(v["members"]), strconv.Itoa(id), c, "duplicate_identity", sourcePath(s.path, "members", strconv.Itoa(id)), func() any { return member })
+			s.nveMember(c, v, m)
 			continue
 		} else if m = textparse.Match(`description (.+)`, t); m != nil {
 			s.assign(v, "description", m[1], c)
@@ -128,35 +101,15 @@ func (s *cfgState) vrf(b *cfgBlock, afs bool) vxlan.Record {
 				s.issue(c, "unsupported_configuration")
 				continue
 			}
-			targetsStart, exportsStart := len(record.Rows(v["route_targets"])), len(record.Rows(v["exports"]))
-			for _, x := range c.children {
-				s.enter(x)
-				if strings.HasPrefix(x.text, "route-target ") {
-					r := s.routeTarget(x)
-					r["address_family"] = family
-					v["route_targets"] = append(record.Rows(v["route_targets"]), r)
-				} else if z := textparse.Match(`export vrf default(?: (\d+))? map (\S+)( allow-vpn)?`, x.text); z != nil {
-					var limit any
-					if z[1] != "" {
-						limit = cfgInt(z[1], 1, 2147483647)
-					}
-					v["exports"] = append(record.Rows(v["exports"]), vxlan.Record{"vrf": "default", "prefix_limit": limit, "route_map": z[2], "allow_vpn": z[3] != "", "address_family": family})
-				} else {
-					s.issue(x, "unsupported_configuration")
-					continue
-				}
-				s.leaf(x)
-			}
-			for i, r := range record.Rows(v["route_targets"])[targetsStart:] {
-				s.capture(c, r, sourcePath(s.path, "route_targets", targetsStart+i))
-			}
-			for i, r := range record.Rows(v["exports"])[exportsStart:] {
-				s.capture(c, r, sourcePath(s.path, "exports", exportsStart+i))
-			}
+			s.vrfAddressFamily(c, v, family)
 			continue
 		} else if strings.HasPrefix(t, "ip route ") {
 			value := s.scope(c, sourcePath(s.path, "routes", len(record.Rows(v["routes"]))), func() any { return s.staticRoute(c) })
-			v["routes"] = append(record.Rows(v["routes"]), value.(vxlan.Record))
+			route, ok := value.(vxlan.Record)
+			if !ok {
+				panic("nxos: route scope returned an invalid type")
+			}
+			v["routes"] = append(record.Rows(v["routes"]), route)
 		} else if strings.HasPrefix(t, "description ") {
 			s.ignore(c)
 			continue
@@ -250,4 +203,63 @@ func (s *cfgState) staticRoute(b *cfgBlock) vxlan.Record {
 		cfgPrefix(cfgIP(w[3+offset])+"/32", "ipv4", false)
 	}
 	return vxlan.Record{"prefix": cfgPrefix(w[2], "ipv4", false), "next_hop": hop, "options": strings.Join(w[4:], " ")}
+}
+
+func (s *cfgState) nveMember(c *cfgBlock, v vxlan.Record, m []string) {
+	id := cfgInt(m[1], 1, 16777215)
+	member := vxlan.Record{"associate_vrf": m[2] != ""}
+	if m[3] != "" {
+		member["multicast_group"] = cfgMulticast(m[3])
+	}
+	for _, x := range c.children {
+		s.enter(x)
+		if x.text == "ingress-replication protocol bgp" {
+			member["replication"] = "bgp"
+		} else if g := textparse.Match(`mcast-group (\S+)`, x.text); g != nil {
+			group := cfgMulticast(g[1])
+			if old := member["multicast_group"]; old != nil && old != group {
+				panic("invalid_configuration_value")
+			}
+			member["multicast_group"] = group
+		} else if x.text == "suppress-arp" || x.text == "no suppress-arp" {
+			s.assign(member, "suppress_arp", x.text == "suppress-arp", x)
+		} else {
+			s.issue(x, "unsupported_configuration")
+			continue
+		}
+		s.leaf(x)
+	}
+	s.current = c
+	if member["replication"] == "bgp" && member["multicast_group"] != nil {
+		panic("invalid_configuration_value")
+	}
+	s.store(record.Map(v["members"]), strconv.Itoa(id), c, "duplicate_identity", sourcePath(s.path, "members", strconv.Itoa(id)), func() any { return member })
+}
+
+func (s *cfgState) vrfAddressFamily(c *cfgBlock, v vxlan.Record, family string) {
+	targetsStart, exportsStart := len(record.Rows(v["route_targets"])), len(record.Rows(v["exports"]))
+	for _, x := range c.children {
+		s.enter(x)
+		if strings.HasPrefix(x.text, "route-target ") {
+			r := s.routeTarget(x)
+			r["address_family"] = family
+			v["route_targets"] = append(record.Rows(v["route_targets"]), r)
+		} else if z := textparse.Match(`export vrf default(?: (\d+))? map (\S+)( allow-vpn)?`, x.text); z != nil {
+			var limit any
+			if z[1] != "" {
+				limit = cfgInt(z[1], 1, 2147483647)
+			}
+			v["exports"] = append(record.Rows(v["exports"]), vxlan.Record{"vrf": "default", "prefix_limit": limit, "route_map": z[2], "allow_vpn": z[3] != "", "address_family": family})
+		} else {
+			s.issue(x, "unsupported_configuration")
+			continue
+		}
+		s.leaf(x)
+	}
+	for i, r := range record.Rows(v["route_targets"])[targetsStart:] {
+		s.capture(c, r, sourcePath(s.path, "route_targets", targetsStart+i))
+	}
+	for i, r := range record.Rows(v["exports"])[exportsStart:] {
+		s.capture(c, r, sourcePath(s.path, "exports", exportsStart+i))
+	}
 }

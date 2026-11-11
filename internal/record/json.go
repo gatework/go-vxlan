@@ -17,6 +17,7 @@ func JSON(value any) []byte {
 	return body
 }
 
+// CanonicalJSON encodes supported evidence with stable object ordering and exact numbers.
 func CanonicalJSON(value any) ([]byte, error) {
 	var b bytes.Buffer
 	e := json.NewEncoder(&b)

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -26,10 +27,13 @@ type Capture struct {
 func (c Capture) String() string {
 	return fmt.Sprintf("Capture{complete=%t bytes=%d}", c.Complete, len(c.Body))
 }
+
+// GoString returns diagnostic metadata without captured payloads.
 func (c Capture) GoString() string { return c.String() }
 
+// Session provides synchronous command capture on a borrowed connection.
 type Session interface {
-	Read(context.Context, string) (Capture, error)
+	Read(ctx context.Context, command string) (Capture, error)
 }
 
 // OpenSession lends one exclusive session to a synchronous, single callback.
@@ -38,6 +42,7 @@ type OpenSession func(context.Context, func(context.Context, Session) error) err
 
 var errSessionReentered = errors.New("session reentered")
 
+// Request binds a parser profile, target and requested dimensions.
 type Request struct {
 	Target     vxlan.Record
 	FabricKey  any
@@ -45,7 +50,9 @@ type Request struct {
 	Profile    *parser.Profile
 }
 
-func (r Request) String() string   { return fmt.Sprintf("Request{dimensions=%d}", len(r.Dimensions)) }
+func (r Request) String() string { return fmt.Sprintf("Request{dimensions=%d}", len(r.Dimensions)) }
+
+// GoString returns diagnostic metadata without captured payloads.
 func (r Request) GoString() string { return r.String() }
 func request(r Request) (Request, error) {
 	if _, err := vxlan.ProjectRecord(vxlan.Record{"target": r.Target, "fabric_key": r.FabricKey}); err != nil {
@@ -71,16 +78,14 @@ func request(r Request) (Request, error) {
 		}
 		seen[n] = true
 	}
-	r.Target = record.Copy(r.Target).(vxlan.Record)
+	r.Target = record.Clone(r.Target)
 	r.FabricKey = record.Copy(r.FabricKey)
 	r.Dimensions = append([]string{}, r.Dimensions...)
 	return r, nil
 }
 func failure(name, code string, details vxlan.Record) vxlan.Observation {
 	r := vxlan.Record{"code": code}
-	for k, v := range details {
-		r[k] = v
-	}
+	maps.Copy(r, details)
 	o := observation(name, "failed", nil, []vxlan.Record{r})
 	now := time.Now().UTC()
 	o.CompletedAt = &now
@@ -173,6 +178,9 @@ func Collect(ctx context.Context, open OpenSession, r Request) (vxlan.Snapshot, 
 }
 
 // CollectSession borrows an already-open, exclusively held session without reconnecting it.
+// CollectSession captures dimensions through a caller-owned session without closing it.
+//
+//nolint:revive // Published API name distinguishes borrowed-session capture from owning collection.
 func CollectSession(ctx context.Context, session Session, r Request) (vxlan.Snapshot, error) {
 	r, e := request(r)
 	if e != nil {
@@ -207,61 +215,65 @@ func collectionError(e error) string {
 // A classified error is one diagnostic cause unless it supplies FailureCodes.
 // Ordinary wrappers and joins may contain independent operation/cleanup causes.
 func collectionErrorCodes(err error, fallback string) []string {
-	var codes []string
-	seen := map[string]bool{}
-	add := func(code string) {
-		if code == "" {
-			code = fallback
-		}
-		if !seen[code] {
-			seen[code] = true
-			codes = append(codes, code)
-		}
+	c := errorCodeCollector{seen: map[string]bool{}, fallback: fallback}
+	c.visit(err)
+	return c.codes
+}
+
+type errorCodeCollector struct {
+	codes    []string
+	seen     map[string]bool
+	fallback string
+}
+
+func (c *errorCodeCollector) add(code string) {
+	if code == "" {
+		code = c.fallback
 	}
-	var visit func(error)
-	visit = func(err error) {
-		if err == nil {
+	if !c.seen[code] {
+		c.seen[code] = true
+		c.codes = append(c.codes, code)
+	}
+}
+
+//nolint:errorlint // Each node must be classified independently before traversing wrapped causes.
+func (c *errorCodeCollector) visit(err error) {
+	if err == nil {
+		return
+	}
+	if multiple, ok := err.(interface{ FailureCodes() []string }); ok {
+		if classified := multiple.FailureCodes(); len(classified) > 0 {
+			for _, code := range classified {
+				c.add(code)
+			}
 			return
 		}
-		if multiple, ok := err.(interface{ FailureCodes() []string }); ok {
-			if classified := multiple.FailureCodes(); len(classified) > 0 {
-				for _, code := range classified {
-					add(code)
-				}
-				return
-			}
-		}
-		code := ""
-		if coded, ok := err.(CodedError); ok {
-			code = coded.FailureCode()
-			if code != "session_close_failed" {
-				code = collectionError(err)
-			}
-		} else {
-			switch wrapped := err.(type) {
-			case interface{ Unwrap() []error }:
-				for _, cause := range wrapped.Unwrap() {
-					visit(cause)
-				}
-				return
-			case interface{ Unwrap() error }:
-				if cause := wrapped.Unwrap(); cause != nil {
-					visit(cause)
-					return
-				}
-			}
+	}
+	var code string
+	if coded, ok := err.(CodedError); ok {
+		code = coded.FailureCode()
+		if code != "session_close_failed" {
 			code = collectionError(err)
-			if code == "connection_failed" {
-				code = fallback
+		}
+	} else {
+		switch wrapped := err.(type) {
+		case interface{ Unwrap() []error }:
+			for _, cause := range wrapped.Unwrap() {
+				c.visit(cause)
+			}
+			return
+		case interface{ Unwrap() error }:
+			if cause := wrapped.Unwrap(); cause != nil {
+				c.visit(cause)
+				return
 			}
 		}
-		add(code)
+		code = collectionError(err)
+		if code == "connection_failed" {
+			code = c.fallback
+		}
 	}
-	visit(err)
-	if len(codes) == 0 {
-		return []string{fallback}
-	}
-	return codes
+	c.add(code)
 }
 
 func addCollectionIssues(obs map[string]vxlan.Observation, codes []string, details vxlan.Record) {
@@ -276,9 +288,7 @@ func addCollectionIssues(obs map[string]vxlan.Observation, codes []string, detai
 			continue
 		}
 		issue := vxlan.Record{"code": code}
-		for key, value := range details {
-			issue[key] = value
-		}
+		maps.Copy(issue, details)
 		o.Issues = append(o.Issues, issue)
 		seen[code] = true
 	}
@@ -287,49 +297,21 @@ func addCollectionIssues(obs map[string]vxlan.Observation, codes []string, detai
 
 func readDimensions(ctx context.Context, session Session, r Request) map[string]vxlan.Observation {
 	obs := map[string]vxlan.Observation{}
-	failed := ""
-	read := func(command string) (Capture, error) {
-		if failed != "" {
-			return Capture{}, fmt.Errorf("prior failure")
-		}
-		if e := ctx.Err(); e != nil {
-			failed = collectionError(e)
-			return Capture{}, e
-		}
-		if session == nil {
-			failed = "session_not_opened"
-			return Capture{}, fmt.Errorf("missing session")
-		}
-		c, e := session.Read(ctx, command)
-		if _, evidenceErr := vxlan.ProjectRecord(vxlan.Record{"evidence": c.Evidence, "started_at": c.StartedAt, "completed_at": c.CompletedAt}); evidenceErr != nil {
-			// Invalid metadata cannot be copied or persisted. Accepted body facts
-			// still survive independently, accompanied by the evidence failure.
-			c.Evidence, c.StartedAt, c.CompletedAt = nil, nil, nil
-			e = errors.Join(e, evidenceErr)
-		}
-		if e != nil {
-			if state, ok := session.(interface{ Connected() bool }); ctx.Err() != nil || !ok || !state.Connected() {
-				failed = collectionError(e)
-			}
-		} else if !c.Complete {
-			failed = "incomplete_output"
-			e = fmt.Errorf("incomplete capture")
-		}
-		return c, e
-	}
+	reader := &captureReader{session: session}
+	read := func(command string) (Capture, error) { return reader.read(ctx, command) }
 	for _, cmd := range r.Profile.PreparationCommands() {
 		c, e := read(cmd)
 		o := obs["collection"]
 		o.Evidence = append(o.Evidence, record.CopyRecords(c.Evidence)...)
 		obs["collection"] = o
 		if e != nil {
-			if failed == "" {
-				failed = collectionError(e)
+			if reader.failed == "" {
+				reader.failed = collectionError(e)
 			}
 			for _, n := range r.Dimensions {
-				obs[n] = failure(n, failed, nil)
+				obs[n] = failure(n, reader.failed, nil)
 			}
-			addCollectionIssues(obs, collectionErrorCodes(e, failed), vxlan.Record{"command": cmd})
+			addCollectionIssues(obs, collectionErrorCodes(e, reader.failed), vxlan.Record{"command": cmd})
 			return obs
 		}
 	}
@@ -345,53 +327,100 @@ func readDimensions(ctx context.Context, session Session, r Request) map[string]
 		}
 	}
 	for _, name := range ordered {
-		if reason := r.Profile.AbsentReason(name, obs["configuration"], true); failed == "" && reason != "" {
+		if reason := r.Profile.AbsentReason(name, obs["configuration"], true); reader.failed == "" && reason != "" {
 			obs[name] = observation(name, "complete", nil, []vxlan.Record{{"code": reason}})
 			continue
 		}
 		cmd := r.Profile.Command(name)
-		skipped := failed != ""
+		skipped := reader.failed != ""
 		started := time.Now().UTC()
 		c, e := read(cmd)
 		ended := time.Now().UTC()
 		var o vxlan.Observation
 		if e != nil && !skipped {
-			fallback := failed
+			fallback := reader.failed
 			if fallback == "" {
 				fallback = "connection_failed"
 			}
 			addCollectionIssues(obs, collectionErrorCodes(e, fallback), vxlan.Record{"command": cmd})
 		}
-		if !c.Complete {
-			code := failed
-			if code == "" {
-				code = collectionError(e)
-			}
-			o = failure(name, code, vxlan.Record{"command": cmd, "skipped": skipped})
-		} else if reason := r.Profile.AbsentReason(name, obs["configuration"], false); strings.TrimSpace(c.Body) == "" && reason != "" {
-			o = observation(name, "complete", nil, []vxlan.Record{{"code": reason}})
-		} else {
-			var parseErr error
-			o, parseErr = r.Profile.Parse(name, c.Body, true)
-			if parseErr != nil {
-				o = failure(name, "command_processing_failed", vxlan.Record{"command": cmd})
-			}
-		}
-		o.StartedAt = &started
-		o.CompletedAt = &ended
-		if c.StartedAt != nil {
-			o.StartedAt = new(*c.StartedAt)
-		}
-		if c.CompletedAt != nil {
-			o.CompletedAt = new(*c.CompletedAt)
-		}
-		o.Evidence = record.CopyRecords(c.Evidence)
-		if c.Complete && len(o.Evidence) == 0 {
-			o.Evidence = []vxlan.Record{{"command": cmd, "sha256": fmt.Sprintf("%x", sha256.Sum256([]byte(c.Body))), "bytes": len(c.Body), "observed_at": ended.Format("2006-01-02T15:04:05.000000Z")}}
-		}
+		o = parseDimension(r, name, c, e, skipped, reader.failed, obs["configuration"])
+		o = captureProvenance(o, c, cmd, started, ended)
 		obs[name] = o
 	}
 	collection := obs["collection"]
 	obs["collection"] = collectionObservation(obs, collection.Issues, collection.Evidence)
 	return obs
+}
+
+type captureReader struct {
+	session Session
+	failed  string
+}
+
+func (r *captureReader) read(ctx context.Context, command string) (Capture, error) {
+	if r.failed != "" {
+		return Capture{}, fmt.Errorf("prior failure")
+	}
+	if e := ctx.Err(); e != nil {
+		r.failed = collectionError(e)
+		return Capture{}, e
+	}
+	if r.session == nil {
+		r.failed = "session_not_opened"
+		return Capture{}, fmt.Errorf("missing session")
+	}
+	c, e := r.session.Read(ctx, command)
+	if _, evidenceErr := vxlan.ProjectRecord(vxlan.Record{"evidence": c.Evidence, "started_at": c.StartedAt, "completed_at": c.CompletedAt}); evidenceErr != nil {
+		// Invalid metadata cannot be copied or persisted. Accepted body facts
+		// still survive independently, accompanied by the evidence failure.
+		c.Evidence, c.StartedAt, c.CompletedAt = nil, nil, nil
+		e = errors.Join(e, evidenceErr)
+	}
+	if e != nil {
+		if state, ok := r.session.(interface{ Connected() bool }); ctx.Err() != nil || !ok || !state.Connected() {
+			r.failed = collectionError(e)
+		}
+	} else if !c.Complete {
+		r.failed = "incomplete_output"
+		e = fmt.Errorf("incomplete capture")
+	}
+	return c, e
+}
+
+func parseDimension(r Request, name string, c Capture, e error, skipped bool, failed string, configuration vxlan.Observation) vxlan.Observation {
+	cmd := r.Profile.Command(name)
+	var o vxlan.Observation
+	if !c.Complete {
+		code := failed
+		if code == "" {
+			code = collectionError(e)
+		}
+		o = failure(name, code, vxlan.Record{"command": cmd, "skipped": skipped})
+	} else if reason := r.Profile.AbsentReason(name, configuration, false); strings.TrimSpace(c.Body) == "" && reason != "" {
+		o = observation(name, "complete", nil, []vxlan.Record{{"code": reason}})
+	} else {
+		var parseErr error
+		o, parseErr = r.Profile.Parse(name, c.Body, true)
+		if parseErr != nil {
+			o = failure(name, "command_processing_failed", vxlan.Record{"command": cmd})
+		}
+	}
+	return o
+}
+
+func captureProvenance(o vxlan.Observation, c Capture, cmd string, started, ended time.Time) vxlan.Observation {
+	o.StartedAt = &started
+	o.CompletedAt = &ended
+	if c.StartedAt != nil {
+		o.StartedAt = new(*c.StartedAt)
+	}
+	if c.CompletedAt != nil {
+		o.CompletedAt = new(*c.CompletedAt)
+	}
+	o.Evidence = record.CopyRecords(c.Evidence)
+	if c.Complete && len(o.Evidence) == 0 {
+		o.Evidence = []vxlan.Record{{"command": cmd, "sha256": fmt.Sprintf("%x", sha256.Sum256([]byte(c.Body))), "bytes": len(c.Body), "observed_at": ended.Format("2006-01-02T15:04:05.000000Z")}}
+	}
+	return o
 }

@@ -1,13 +1,16 @@
 package configuration_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
 
 	vxlan "github.com/gatework/go-vxlan"
-	"github.com/gatework/go-vxlan/configuration"
-	"github.com/gatework/go-vxlan/review"
+	"github.com/gatework/go-vxlan/fabric"
+	"github.com/gatework/go-vxlan/rules"
+
+	"github.com/gatework/go-netops/assess"
 	"github.com/gatework/go-vxlan/vendors"
 )
 
@@ -46,13 +49,18 @@ func benchmarkFabric(devices, services int) (vxlan.Record, []vxlan.Record, vxlan
 	return configs, documents, policy
 }
 
-func BenchmarkServiceCatalog(b *testing.B) {
+func BenchmarkServices(b *testing.B) {
 	for _, services := range []int{64, 256, 1024} {
 		b.Run(fmt.Sprintf("vnis=%d", services), func(b *testing.B) {
 			configs, _, _ := benchmarkFabric(4, services)
+			body, _ := json.Marshal(configs["192.0.2.1"])
+			c, err := fabric.DecodeConfiguration(body)
+			if err != nil {
+				b.Fatal(err)
+			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if catalog := configuration.ServiceCatalog(configs); len(catalog) != services {
+				if n := len(c.Services()); n != services {
 					b.Fatal("service associations lost")
 				}
 			}
@@ -60,17 +68,35 @@ func BenchmarkServiceCatalog(b *testing.B) {
 	}
 }
 
-func BenchmarkFabricReview(b *testing.B) {
+func BenchmarkFabricAssessment(b *testing.B) {
 	profile, err := vendors.NewBuiltinRegistry().Fetch("cisco_nxos", "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	assessor, err := rules.NewAssessor(assess.Policy{}, profile)
 	if err != nil {
 		b.Fatal(err)
 	}
 	for _, devices := range []int{4, 16, 64} {
 		b.Run(fmt.Sprintf("devices=%d", devices), func(b *testing.B) {
 			_, documents, policy := benchmarkFabric(devices, 16)
+			var ds []*fabric.Device
+			for _, doc := range documents {
+				d, err := fabric.EncodeDocument(doc)
+				if err != nil {
+					b.Fatal(err)
+				}
+				ds = append(ds, d)
+			}
+			body, _ := json.Marshal(policy)
+			p, _ := fabric.DecodePolicy(body)
+			m, err := fabric.Build(ds, &p)
+			if err != nil {
+				b.Fatal(err)
+			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := review.ReviewFabric(documents, policy, profile); err != nil {
+				if _, err := assessor.Assess(b.Context(), m); err != nil {
 					b.Fatal(err)
 				}
 			}

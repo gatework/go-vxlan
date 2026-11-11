@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 )
 
+// Record holds a projected evidence object.
 type Record = map[string]any
 
+// Map returns a record view, or an empty record for other types.
 func Map(v any) Record {
 	m, _ := v.(map[string]any)
 	if m == nil {
@@ -18,6 +21,7 @@ func Map(v any) Record {
 	return m
 }
 
+// Number converts supported numeric values to an integer.
 func Number(v any) int {
 	switch n := v.(type) {
 	case int:
@@ -32,6 +36,7 @@ func Number(v any) int {
 	}
 }
 
+// NumberFloat converts supported numeric values to float64.
 func NumberFloat(v any) float64 {
 	switch n := v.(type) {
 	case int:
@@ -44,6 +49,7 @@ func NumberFloat(v any) float64 {
 	return math.NaN()
 }
 
+// Int64 recognizes integral values representable by int64.
 func Int64(value any) (int64, bool) {
 	switch n := value.(type) {
 	case int:
@@ -62,19 +68,21 @@ func Int64(value any) (int64, bool) {
 	return 0, false
 }
 
-func Integer(v any, min, max int) bool {
+// Integer recognizes an exact integer within inclusive bounds.
+func Integer(v any, minimum, maximum int) bool {
 	switch n := v.(type) {
 	case int:
-		return n >= min && n <= max
+		return n >= minimum && n <= maximum
 	case int64:
-		return n >= int64(min) && n <= int64(max)
+		return n >= int64(minimum) && n <= int64(maximum)
 	case float64:
-		return n >= float64(min) && n <= float64(max) && math.Trunc(n) == n
+		return n >= float64(minimum) && n <= float64(maximum) && math.Trunc(n) == n
 	default:
 		return false
 	}
 }
 
+// String returns the string value, or an empty string for other types.
 func String(v any) string {
 	if v == nil {
 		return ""
@@ -82,8 +90,10 @@ func String(v any) string {
 	return fmt.Sprint(v)
 }
 
+// Truthy reports whether a value is neither nil nor false.
 func Truthy(v any) bool { return v != nil && v != false }
 
+// Equal compares normalized evidence values.
 func Equal(a, b any) bool {
 	switch x := a.(type) {
 	case string:
@@ -110,6 +120,7 @@ func Equal(a, b any) bool {
 	return leftErr == nil && rightErr == nil && bytes.Equal(left, right)
 }
 
+// At traverses nested record keys.
 func At(v Record, keys ...string) any {
 	var a any = v
 	for _, k := range keys {
@@ -118,17 +129,15 @@ func At(v Record, keys ...string) any {
 	return a
 }
 
+// Merge returns a shallow merged record with the second record taking precedence.
 func Merge(a, b Record) Record {
 	m := Record{}
-	for k, v := range a {
-		m[k] = v
-	}
-	for k, v := range b {
-		m[k] = v
-	}
+	maps.Copy(m, a)
+	maps.Copy(m, b)
 	return m
 }
 
+// MergeLayers recursively merges configuration layers in increasing precedence.
 func MergeLayers(ms ...Record) Record {
 	out := Record{}
 	for _, m := range ms {
@@ -143,6 +152,7 @@ func MergeLayers(ms ...Record) Record {
 	return out
 }
 
+// Select copies the requested fields into a new record.
 func Select(a Record, keys ...string) Record {
 	m := Record{}
 	for _, k := range keys {
@@ -153,6 +163,7 @@ func Select(a Record, keys ...string) Record {
 	return m
 }
 
+// Compact copies non-nil fields into a new record.
 func Compact(a Record) Record {
 	m := Record{}
 	for k, v := range a {

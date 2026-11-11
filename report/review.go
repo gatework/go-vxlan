@@ -11,12 +11,14 @@ import (
 	"github.com/gatework/go-vxlan/internal/record"
 )
 
+// Source pairs retained evidence with its original path and bytes.
 type Source struct {
 	Path     string
 	Body     []byte
 	Document vxlan.Record
 }
 
+// ReadSources loads and validates the retained device evidence in a batch.
 func ReadSources(ctx context.Context, batch string) ([]Source, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

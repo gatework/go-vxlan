@@ -4,10 +4,12 @@ github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfv
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/gatework/go-expect v0.5.0 h1:T3qYg02kd8aXIi25BXn4Ku6Vz2Z0obGHnjiXc2Bx/tY=
-github.com/gatework/go-expect v0.5.0/go.mod h1:VksOEeAZc6iZjmIyYxE2+ZZMKQIaOgayu4f1URe5uIs=
-github.com/gatework/go-net-connector v0.6.0 h1:XqNUCQacJ1AscpVSk40DyonfdssxZvgskxs3NjO7KyA=
-github.com/gatework/go-net-connector v0.6.0/go.mod h1:qre+xlEw3ThC+3ymiq2VZ7bFy5/WsRlSxaBrN82wAs4=
+github.com/gatework/go-expect v0.6.0 h1:nl+ndH5hYVxNSpgTjfoi0vAvf8/mNqk462xDPCgwyoI=
+github.com/gatework/go-expect v0.6.0/go.mod h1:VksOEeAZc6iZjmIyYxE2+ZZMKQIaOgayu4f1URe5uIs=
+github.com/gatework/go-net-connector v0.7.1 h1:FR0qtxC8Nm2ii57AvfhX5BRFwpoiG60qg6uUNmY1Iuc=
+github.com/gatework/go-net-connector v0.7.1/go.mod h1:9E6N3dHlwa/iWLDagzanMD+mq1RMV+LEED9auXjB5Lw=
+github.com/gatework/go-netops v0.3.0 h1:sTHaPudEL1IqZh8FzM7AkAOO5Sh25xD+i29nNOVDyNg=
+github.com/gatework/go-netops v0.3.0/go.mod h1:JpEw01h81Ji9LXQFDFayosgz5cLmfoqRBmmN4rRKpAE=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
@@ -20,8 +22,6 @@ github.com/jackc/puddle/v2 v2.2.3 h1:f8HoREISb3l5eO9coPgK7U3hKLhWGokOFVcThl5jrao
 github.com/jackc/puddle/v2 v2.2.3/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
-github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d h1:hrujxIzL1woJ7AwssoOcM/tq5JjjG2yYOc8odClEiXA=
 github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d/go.mod h1:uugorj2VCxiV1x+LzaIdVa9b4S4qGAcH6cbhh4qVxOU=

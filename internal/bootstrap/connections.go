@@ -20,6 +20,7 @@ type Dependencies struct {
 	Profiles *parser.Registry
 }
 
+// NewDependencies binds the supplied session opener and built-in parsing profiles.
 func NewDependencies(open OpenFunc) Dependencies {
 	if open == nil {
 		open = netconnector.Open

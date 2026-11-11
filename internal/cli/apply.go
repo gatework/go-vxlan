@@ -31,28 +31,7 @@ func (a *App) apply(ctx context.Context, f *pflag.FlagSet) int {
 		return a.fail(fmt.Errorf("需要有效 --plan 和 --item"))
 	}
 	path := bootstrap.Absolute(flagString(f, "plan"), a.CWD, a.Home)
-	if err := ctx.Err(); err != nil {
-		return a.fail(err)
-	}
-	body, e := os.ReadFile(path)
-	if err := ctx.Err(); err != nil {
-		return a.fail(err)
-	}
-	if e != nil {
-		return a.fail(fmt.Errorf("计划无法读取"))
-	}
-	hash := fmt.Sprintf("%x", sha256.Sum256(body))
-	if err := ctx.Err(); err != nil {
-		return a.fail(err)
-	}
-	checksum, e := os.ReadFile(path + ".sha256")
-	if err := ctx.Err(); err != nil {
-		return a.fail(err)
-	}
-	if e != nil || strings.TrimSpace(string(checksum)) != hash {
-		return a.fail(fmt.Errorf("计划校验失败"))
-	}
-	bound, e := change.NewExecutionPlan(body, id)
+	bound, hash, e := readExecutionPlan(ctx, path, id)
 	if e != nil {
 		return a.fail(e)
 	}
@@ -93,4 +72,33 @@ func (a *App) apply(ctx context.Context, f *pflag.FlagSet) int {
 		return 2
 	}
 	return 0
+}
+
+func readExecutionPlan(ctx context.Context, path, id string) (*change.ExecutionPlan, string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	body, e := os.ReadFile(path)
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if e != nil {
+		return nil, "", fmt.Errorf("计划无法读取")
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256(body))
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	checksum, e := os.ReadFile(path + ".sha256")
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
+	if e != nil || strings.TrimSpace(string(checksum)) != hash {
+		return nil, "", fmt.Errorf("计划校验失败")
+	}
+	bound, e := change.NewExecutionPlan(body, id)
+	if e != nil {
+		return nil, "", e
+	}
+	return bound, hash, nil
 }

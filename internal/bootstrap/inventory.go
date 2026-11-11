@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
 	"path/filepath"
 	"strings"
@@ -65,9 +66,7 @@ func prepareInventory(ctx context.Context, c *Config, fileenv, process map[strin
 	if c.Values["netdisco_config"] != nil {
 		c.Values["inventory_configuration"] = c.Inventory
 	} else {
-		for k, v := range c.Inventory {
-			c.Values[k] = v
-		}
+		maps.Copy(c.Values, c.Inventory)
 	}
 	return nil
 }
@@ -138,6 +137,7 @@ type inventorySettings struct {
 	fetch   func(context.Context) (netdisco.CacheResult, error)
 }
 
+// InventoryResult retains selected devices and inventory cache evidence.
 type InventoryResult struct {
 	Devices []any
 	Cache   netdisco.CacheResult
@@ -154,40 +154,12 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 	nd := record.Map(c.Inventory["netdisco"])
 	inv := record.Map(c.Inventory["inventory"])
 	opts := inventory.SelectionOptions{IncludeHosts: record.Texts(inv["include_hosts"]), ExcludeHosts: record.Texts(inv["exclude_hosts"]), IncludeNames: record.Texts(inv["include_names"]), ExcludeNames: record.Texts(inv["exclude_names"]), IncludeVendors: record.Texts(inv["include_vendors"]), ExcludeVendors: record.Texts(inv["exclude_vendors"]), IncludeModels: record.Texts(inv["include_models"]), ExcludeModels: record.Texts(inv["exclude_models"]), NameMatch: record.String(inv["name_match"]), ModelMatch: record.String(inv["model_match"])}
-	toStrings := func(v any) map[string]string {
-		r := map[string]string{}
-		for k, x := range record.Map(v) {
-			r[k] = record.String(x)
-		}
-		return r
-	}
-	ruleOptions := fleet.RuleOptions{Selection: opts, VendorOverrides: toStrings(inv["vendor_overrides"]), HostOverrides: toStrings(inv["host_overrides"])}
+
+	ruleOptions := fleet.RuleOptions{Selection: opts, VendorOverrides: inventoryStringMap(inv["vendor_overrides"]), HostOverrides: inventoryStringMap(inv["host_overrides"])}
 	for _, value := range record.List(inv["device_rules"]) {
-		m, ok := value.(map[string]any)
-		if !ok {
-			return settings, fmt.Errorf("invalid device rule")
-		}
-		rule := fleet.Mapping{}
-		for k, v := range m {
-			if v == nil && (k == "os" || k == "model_prefix") {
-				continue
-			}
-			text, ok := v.(string)
-			if !ok {
-				return settings, fmt.Errorf("invalid device rule")
-			}
-			switch k {
-			case "vendor":
-				rule.Vendor = text
-			case "connector":
-				rule.Connector = text
-			case "os":
-				rule.OS = &text
-			case "model_prefix":
-				rule.ModelPrefix = &text
-			default:
-				return settings, fmt.Errorf("unknown device rule field")
-			}
+		rule, err := inventoryMapping(value)
+		if err != nil {
+			return settings, err
 		}
 		ruleOptions.Mappings = append(ruleOptions.Mappings, rule)
 	}
@@ -195,30 +167,19 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 	if e != nil {
 		return settings, e
 	}
-	get := func(k, def string) string {
-		if v := record.String(nd[k]); v != "" {
-			return v
-		}
-		return def
-	}
-	num := func(k string, def int) int {
-		if v, ok := nd[k]; ok {
-			return int(record.NumberFloat(v))
-		}
-		return def
-	}
-	mode := get("cache_mode", "prefer")
-	limits := netdisco.Limits{PageSize: num("page_size", 500), MaxPages: num("max_pages", 10000), MaxDevices: num("max_devices", 100000), MaxResponseBytes: int64(num("max_response_bytes", 16<<20)), MaxInventoryBytes: int64(num("max_inventory_bytes", 128<<20)), Timeout: time.Duration(num("inventory_timeout", 300)) * time.Second}
+
+	mode := inventoryString(nd, "cache_mode", "prefer")
+	limits := netdisco.Limits{PageSize: inventoryNumber(nd, "page_size", 500), MaxPages: inventoryNumber(nd, "max_pages", 10000), MaxDevices: inventoryNumber(nd, "max_devices", 100000), MaxResponseBytes: int64(inventoryNumber(nd, "max_response_bytes", 16<<20)), MaxInventoryBytes: int64(inventoryNumber(nd, "max_inventory_bytes", 128<<20)), Timeout: time.Duration(inventoryNumber(nd, "inventory_timeout", 300)) * time.Second}
 	options := netdisco.FetchOptions{Mode: netdisco.CacheMode(mode)}
 	if nd["cache_enabled"] != false {
-		ttl := time.Duration(num("cache_ttl", 72*3600)) * time.Second
-		options.Cache = &netdisco.CachePolicy{Directory: get("cache_directory", ""), Namespace: get("cache_namespace", ""), TTL: &ttl}
+		ttl := time.Duration(inventoryNumber(nd, "cache_ttl", 72*3600)) * time.Second
+		options.Cache = &netdisco.CachePolicy{Directory: inventoryString(nd, "cache_directory", ""), Namespace: inventoryString(nd, "cache_namespace", ""), TTL: &ttl}
 	}
 	settings.rules = rules
 	env := c.Environment
-	switch get("source", "http") {
+	switch inventoryString(nd, "source", "http") {
 	case "http":
-		source := netdisco.HTTPOptions{URL: get("url", ""), Username: env["ND_USERNAME"], Password: env["ND_PASSWORD"], APIKey: env["ND_API_KEY"], RequireHTTPS: nd["allow_insecure_http"] != true, Limits: limits}
+		source := netdisco.HTTPOptions{URL: inventoryString(nd, "url", ""), Username: env["ND_USERNAME"], Password: env["ND_PASSWORD"], APIKey: env["ND_API_KEY"], RequireHTTPS: nd["allow_insecure_http"] != true, Limits: limits}
 		settings.fetch = func(ctx context.Context) (netdisco.CacheResult, error) {
 			return netdisco.FetchHTTP(ctx, source, options)
 		}
@@ -230,7 +191,7 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 		for _, pair := range [][2]string{{"host", "ND_DB_HOST"}, {"dbname", "ND_DB_NAME"}, {"user", "ND_DB_USER"}} {
 			value := env[pair[1]]
 			if value == "" {
-				return settings, fmt.Errorf("Netdisco 数据库凭据缺失")
+				return settings, fmt.Errorf("netdisco 数据库凭据缺失")
 			}
 			dsn = append(dsn, pair[0]+"="+quote(value))
 		}
@@ -242,16 +203,17 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 		if mode != "only" {
 			dsn = append(dsn, "password="+quote(env["ND_DB_PASS"]))
 		}
-		source := netdisco.PostgresOptions{Connection: strings.Join(dsn, " "), Query: get("query", ""), Parameters: record.List(record.Copy(nd["query_params"])), Limits: limits}
+		source := netdisco.PostgresOptions{Connection: strings.Join(dsn, " "), Query: inventoryString(nd, "query", ""), Parameters: record.List(record.Copy(nd["query_params"])), Limits: limits}
 		settings.fetch = func(ctx context.Context) (netdisco.CacheResult, error) {
 			return netdisco.FetchPostgres(ctx, source, options)
 		}
 	default:
-		return settings, fmt.Errorf("Netdisco source 无效")
+		return settings, fmt.Errorf("netdisco source 无效")
 	}
 	return settings, nil
 }
 
+// FetchInventory selects configured devices and retains inventory cache outcomes.
 func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 	var fetched InventoryResult
 	if err := ctx.Err(); err != nil {
@@ -288,4 +250,56 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 	}
 	fetched.Devices = settings.filter.selectDevices(out)
 	return fetched, nil
+}
+
+func inventoryMapping(value any) (fleet.Mapping, error) {
+	m, ok := value.(map[string]any)
+	if !ok {
+		return fleet.Mapping{}, fmt.Errorf("invalid device rule")
+	}
+	rule := fleet.Mapping{}
+	for k, v := range m {
+		if v == nil && (k == "os" || k == "model_prefix") {
+			continue
+		}
+		text, ok := v.(string)
+		if !ok {
+			return fleet.Mapping{}, fmt.Errorf("invalid device rule")
+		}
+		switch k {
+		case "vendor":
+			rule.Vendor = text
+		case "connector":
+			rule.Connector = text
+		case "os":
+			rule.OS = &text
+		case "model_prefix":
+			rule.ModelPrefix = &text
+		default:
+			return fleet.Mapping{}, fmt.Errorf("unknown device rule field")
+		}
+	}
+	return rule, nil
+}
+
+func inventoryStringMap(v any) map[string]string {
+	r := map[string]string{}
+	for k, x := range record.Map(v) {
+		r[k] = record.String(x)
+	}
+	return r
+}
+
+func inventoryString(nd vxlan.Record, k string, def string) string {
+	if v := record.String(nd[k]); v != "" {
+		return v
+	}
+	return def
+}
+
+func inventoryNumber(nd vxlan.Record, k string, def int) int {
+	if v, ok := nd[k]; ok {
+		return int(record.NumberFloat(v))
+	}
+	return def
 }

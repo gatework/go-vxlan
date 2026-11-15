@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	ncconfig "github.com/gatework/go-net-connector/config"
-	"github.com/gatework/go-net-connector/fleet"
-	"github.com/gatework/go-net-connector/inventory"
-	"github.com/gatework/go-net-connector/netdisco"
-	"github.com/gatework/go-net-connector/vendors"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
+	ncconfig "github.com/gatework/net-connector/config"
+	"github.com/gatework/net-connector/fleet"
+	"github.com/gatework/net-connector/inventory"
+	"github.com/gatework/net-connector/netdisco"
+	"github.com/gatework/net-connector/vendors"
 )
 
 func inventorySections(m vxlan.Record) vxlan.Record {
@@ -153,9 +153,9 @@ func inventorySettingsFor(c Config) (inventorySettings, error) {
 	}
 	nd := record.Map(c.Inventory["netdisco"])
 	inv := record.Map(c.Inventory["inventory"])
-	opts := inventory.SelectionOptions{IncludeHosts: record.Texts(inv["include_hosts"]), ExcludeHosts: record.Texts(inv["exclude_hosts"]), IncludeNames: record.Texts(inv["include_names"]), ExcludeNames: record.Texts(inv["exclude_names"]), IncludeVendors: record.Texts(inv["include_vendors"]), ExcludeVendors: record.Texts(inv["exclude_vendors"]), IncludeModels: record.Texts(inv["include_models"]), ExcludeModels: record.Texts(inv["exclude_models"]), NameMatch: record.String(inv["name_match"]), ModelMatch: record.String(inv["model_match"])}
+	opts := inventory.SelectionOptions{IncludeHosts: record.Texts(inv["include_hosts"]), ExcludeHosts: record.Texts(inv["exclude_hosts"]), IncludeNames: record.Texts(inv["include_names"]), ExcludeNames: record.Texts(inv["exclude_names"]), IncludePlatforms: record.Texts(inv["include_platforms"]), ExcludePlatforms: record.Texts(inv["exclude_platforms"]), IncludeModels: record.Texts(inv["include_models"]), ExcludeModels: record.Texts(inv["exclude_models"]), NameMatch: record.String(inv["name_match"]), ModelMatch: record.String(inv["model_match"])}
 
-	ruleOptions := fleet.RuleOptions{Selection: opts, VendorOverrides: inventoryStringMap(inv["vendor_overrides"]), HostOverrides: inventoryStringMap(inv["host_overrides"])}
+	ruleOptions := fleet.RuleOptions{Selection: opts, PlatformOverrides: inventoryStringMap(inv["platform_overrides"]), HostOverrides: inventoryStringMap(inv["host_overrides"])}
 	for _, value := range record.List(inv["device_rules"]) {
 		rule, err := inventoryMapping(value)
 		if err != nil {
@@ -236,7 +236,7 @@ func FetchInventory(ctx context.Context, c Config) (InventoryResult, error) {
 	out := []any{}
 	for _, r := range fetched.Cache.Rows {
 		v := settings.rules.Record(r)
-		if v.Issue == "" && v.Vendor == "cisco_nxos" {
+		if v.Issue == "" && v.Platform == "cisco_nxos" {
 			name := v.Name
 			if name == "" {
 				name = v.Host
@@ -269,8 +269,8 @@ func inventoryMapping(value any) (fleet.Mapping, error) {
 		switch k {
 		case "vendor":
 			rule.Vendor = text
-		case "connector":
-			rule.Connector = text
+		case "platform":
+			rule.Platform = text
 		case "os":
 			rule.OS = &text
 		case "model_prefix":

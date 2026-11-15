@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gatework/go-net-connector/connector"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/vendors/nxos"
+	"github.com/gatework/net-connector/connector"
 )
 
 type applySession struct {

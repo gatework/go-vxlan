@@ -1,3 +1,11 @@
+# v0.5.0 Connector 依赖迁移
+
+运行依赖改为正式 `github.com/gatework/net-connector v0.9.0`、`go-expect v0.6.0` 与 `go-netops v0.4.0`；不再使用旧 `go-net-connector` 模块路径。
+
+共享清单配置须按 Connector 当前平台术语迁移：`include_vendors` / `exclude_vendors` 改为 `include_platforms` / `exclude_platforms`，`vendor_overrides` 改为 `platform_overrides`，`device_rules[].connector` 改为 `device_rules[].platform`。对应环境变量改为 `NC_INCLUDE_PLATFORMS`、`NC_EXCLUDE_PLATFORMS`、`NC_PLATFORM_OVERRIDES`。规则中的 `vendor` 仍匹配清单来源厂商标识；目标平台使用 `platform`。旧配置键会在连接前拒绝。
+
+VXLAN 的领域 API、设备命令、证据、计划 schema 与执行安全边界保持不变。直接向 `adapter/netconnector.Open` 传入连接配置的 Go 调用方应更新 Connector 导入路径；上游类型改用新模块中的同名 API。
+
 # v0.4.0 类型化业务 API 迁移
 
 本版本采用 `fabric` 类型化模型、go-netops v0.3.0 的规则引擎与类型化变更契约。Go 调用者需迁移至类型化模型与规则接口；CLI 新生成的计划使用 schema 3，执行层继续接受通过相同严格校验的 schema 2 计划。任何配置变化仍会使计划过期。

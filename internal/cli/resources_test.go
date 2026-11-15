@@ -13,9 +13,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/gatework/go-net-connector/connector"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
+	"github.com/gatework/net-connector/connector"
 )
 
 func TestPrepareResources(t *testing.T) {

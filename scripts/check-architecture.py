@@ -26,7 +26,7 @@ def violations(graph):
     failures = []
     pure = {"parser", "collect", "configuration", "change", "vendors", "internal/record", "internal/textparse", "fabric", "rules"}
     forbidden_io = {"os", "io/fs", "net/http", "net/rpc", "database/sql", "path/filepath", "syscall"}
-    transport = {"github.com/gatework/go-net-connector", "github.com/gatework/go-expect"}
+    transport = {"github.com/gatework/net-connector", "github.com/gatework/go-expect"}
     terminal = {"github.com/spf13", "golang.org/x/term"}
     for package in graph:
         relative = package["ImportPath"].removeprefix(MODULE).removeprefix("/")

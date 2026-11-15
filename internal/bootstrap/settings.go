@@ -3,9 +3,9 @@ package bootstrap
 import (
 	"time"
 
-	"github.com/gatework/go-net-connector/connector"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
+	"github.com/gatework/net-connector/connector"
 )
 
 // Settings is the validated runtime snapshot. Values remains the configuration

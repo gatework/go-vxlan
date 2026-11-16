@@ -17,6 +17,7 @@ import (
 type rtParser struct {
 	name          string
 	rows, issues  []vxlan.Record
+	evidence      []vxlan.Record
 	empty, header bool
 	totals        []any
 }
@@ -206,11 +207,16 @@ func ParseRuntime(name, text string, complete bool) (vxlan.Observation, error) {
 		p.issue("command_unsupported")
 		return p.result("unsupported"), nil
 	}
-	text = strings.ReplaceAll(text, "\r", "")
-	if name == "nve_peers" || name == "bgp_neighbors" {
-		text = rtNormalizeWrapped(name, text)
+	lines, err := newRuntimeText(text)
+	if err != nil {
+		return vxlan.Observation{}, fmt.Errorf("runtime source: %w", err)
 	}
-	p.content(text, complete)
+	return parseRuntimeText(name, rtNormalizeWrapped(name, lines), complete), nil
+}
+
+func parseRuntimeText(name string, lines runtimeText, complete bool) vxlan.Observation {
+	p := &rtParser{name: name, rows: []vxlan.Record{}, issues: []vxlan.Record{}}
+	p.content(lines, complete)
 	if strings.HasPrefix(name, "l2route_") {
 		p.finishRoutes(complete)
 	} else {
@@ -220,7 +226,7 @@ func ParseRuntime(name, text string, complete bool) (vxlan.Observation, error) {
 	if len(p.issues) > 0 {
 		status = "partial"
 	}
-	return p.result(status), nil
+	return p.result(status)
 }
 func rtIndex(name string) int {
 	for i, query := range querySpecs() {
@@ -231,7 +237,8 @@ func rtIndex(name string) int {
 	return -1
 }
 func (p *rtParser) result(status string) vxlan.Observation {
-	return observation(p.name, status, p.rows, p.issues)
+	o, _ := vxlan.NewObservation(p.name, status, p.rows, p.issues, p.evidence)
+	return o
 }
 func (p *rtParser) finish(complete bool) {
 	if len(p.rows) == 0 && !p.empty {
@@ -250,32 +257,9 @@ func (p *rtParser) finish(complete bool) {
 		p.rows = p.dedup(p.rows, fields, nil)
 	}
 }
-func rtNormalizeWrapped(name, text string) string {
-	lines := strings.SplitAfter(text, "\n")
-	out := []string{}
-	for _, line := range lines {
-		tail := rtTrim(line)
-		prev := ""
-		if len(out) > 0 {
-			prev = rtTrim(out[len(out)-1])
-		}
-		var join bool
-		if name == "bgp_neighbors" {
-			join = strings.HasSuffix(prev, "State/") && tail == "PfxRcd"
-		} else {
-			join = strings.HasSuffix(prev, "Route") && tail == "r-Mac" || rtMatch(`(?i)^[\da-f]{4}\.[\da-f]{4}$`, tail) && rtMatch(`(?i)^nve\d+\s+\d+(?:\.\d+){3}\s+(?:Up|Down)\s+\S+\s+\S+\s+[\da-f]{4}\.$`, prev)
-		}
-		if join {
-			out[len(out)-1] = strings.TrimRight(out[len(out)-1], " \t\r\n") + tail + "\n"
-		} else {
-			out = append(out, line)
-		}
-	}
-	return strings.Join(out, "")
-}
-func (p *rtParser) lines(text string, separators bool, fn func(string, int)) {
-	for i, source := range strings.Split(text, "\n") {
-		line := rtTrim(source)
+func (p *rtParser) lines(text runtimeText, separators bool, fn func(string, int)) {
+	for _, source := range text {
+		line := rtTrim(source.text)
 		if line == "" || !separators && rtMatch(`^[-=+\s]+$`, line) {
 			continue
 		}
@@ -283,54 +267,33 @@ func (p *rtParser) lines(text string, separators bool, fn func(string, int)) {
 			p.empty = true
 			continue
 		}
-		fn(line, i+1)
+		fn(line, source.first)
 	}
 }
-func (p *rtParser) content(text string, complete bool) {
-	scoped := false
-	if p.name == "bgp_neighbors" || p.name == "ospf_neighbors" {
-		boundary := "BGP summary information for VRF "
-		if p.name == "ospf_neighbors" {
-			boundary = "OSPF Process ID "
+func (p *rtParser) content(text runtimeText, complete bool) {
+	blocks := rtScopeBlocks(p.name, text)
+	if len(blocks) > 1 {
+		allComplete, allEmpty := true, true
+		for _, block := range blocks {
+			o := parseRuntimeText(p.name, block, complete)
+			p.rows = append(p.rows, o.Records...)
+			p.issues = append(p.issues, o.Issues...)
+			p.evidence = append(p.evidence, o.Evidence...)
+			allComplete = allComplete && o.Complete()
+			allEmpty = allEmpty && o.Complete() && len(o.Records) == 0
 		}
-		blocks := []string{}
-		start := 0
-		offset := 0
-		for _, line := range strings.SplitAfter(text, "\n") {
-			if strings.HasPrefix(strings.TrimLeft(line, " \t\r\n"), boundary) && offset > start {
-				b := text[start:offset]
-				if rtTrim(b) != "" {
-					blocks = append(blocks, b)
-				}
-				start = offset
-			}
-			offset += len(line)
-		}
-		if b := text[start:]; rtTrim(b) != "" {
-			blocks = append(blocks, b)
-		}
-		if len(blocks) > 1 {
-			scoped = true
-			allComplete, allEmpty := true, true
-			for _, block := range blocks {
-				o, _ := ParseRuntime(p.name, block, complete)
-				p.rows = append(p.rows, o.Records...)
-				p.issues = append(p.issues, o.Issues...)
-				allComplete = allComplete && o.Complete()
-				allEmpty = allEmpty && o.Complete() && len(o.Records) == 0
-			}
-			p.header = allComplete || len(p.rows) > 0
-			p.empty = allEmpty
-		}
+		p.header = allComplete || len(p.rows) > 0
+		p.empty = allEmpty
 	}
-	if !scoped {
+	if len(blocks) <= 1 {
 		p.parseContent(text)
 	}
 	if p.name == "bgp_neighbors" {
 		p.bgpIdentities(text)
+		p.bgpSummaryScopes()
 	}
 }
-func (p *rtParser) nvePeers(text string) {
+func (p *rtParser) nvePeers(text runtimeText) {
 	p.lines(text, false, func(line string, n int) {
 		if rtMatch(`(?i)^Interface\s+Peer-IP\s+State\s+LearnType\s+Uptime\s+Router-Mac$`, line) {
 			p.header = true
@@ -349,7 +312,7 @@ func (p *rtParser) nvePeers(text string) {
 		p.rows = append(p.rows, r)
 	})
 }
-func (p *rtParser) nveVnis(text string) {
+func (p *rtParser) nveVnis(text runtimeText) {
 	p.lines(text, false, func(line string, n int) {
 		if rtMatch(`(?i)^Interface\s+VNI\s+Multicast-group\s+State\s+Mode\s+Type\s+\[BD/VRF\](?:\s+Flags)?$`, line) {
 			p.header = true
@@ -381,7 +344,7 @@ func (p *rtParser) nveVnis(text string) {
 		}
 	})
 }
-func (p *rtParser) ospf(text string) {
+func (p *rtParser) ospf(text runtimeText) {
 	scope := vxlan.Record{}
 	totals := []any{}
 	p.lines(text, false, func(line string, n int) {
@@ -421,7 +384,7 @@ func (p *rtParser) ospf(text string) {
 	}
 }
 
-func (p *rtParser) parseContent(text string) {
+func (p *rtParser) parseContent(text runtimeText) {
 	switch p.name {
 	case "nve_peers":
 		p.nvePeers(text)

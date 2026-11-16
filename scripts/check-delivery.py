@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEPENDENCIES = {
+    "github.com/gatework/parser": "v0.2.2",
     "github.com/gatework/net-connector": "v0.9.0",
     "github.com/gatework/go-expect": "v0.6.0",
     "github.com/gatework/go-netops": "v0.4.0",

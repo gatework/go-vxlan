@@ -1,7 +1,6 @@
 package nxos
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,7 +39,10 @@ func (p *ConfigurationParser) Parse(text string, complete bool) (vxlan.Observati
 	if err := validateConfigInput(text); err != nil {
 		return vxlan.Observation{}, err
 	}
-	d := newConfigurationDocument(text)
+	d, err := newConfigurationDocument(text)
+	if err != nil {
+		return vxlan.Observation{}, err
+	}
 	o := parseConfig(text, complete, d)
 	p.document = d
 	return o, nil
@@ -94,26 +96,23 @@ type ConfigurationDocument struct {
 	captures []SourceCapture
 }
 
-func newConfigurationDocument(text string) *ConfigurationDocument {
-	d := &ConfigurationDocument{content: text, checksum: fmt.Sprintf("%x", sha256.Sum256([]byte(text)))}
-	for start := 0; start < len(text); {
-		end := start
-		for end < len(text) && text[end] != '\r' && text[end] != '\n' {
-			end++
-		}
-		if end < len(text) {
-			if text[end] == '\r' && end+1 < len(text) && text[end+1] == '\n' {
-				end += 2
-			} else {
-				end++
-			}
-		}
-		raw := text[start:end]
-		d.lines = append(d.lines, SourceLine{index: len(d.lines), raw: raw, indent: len(raw) - len(strings.TrimLeft(raw, " \t"))})
-		d.states = append(d.states, LinePending)
-		start = end
+func newConfigurationDocument(text string) (*ConfigurationDocument, error) {
+	content, err := newTextContent(text)
+	if err != nil {
+		return nil, err
 	}
-	return d
+	d := &ConfigurationDocument{
+		content: content.Text(), checksum: fmt.Sprintf("%x", content.Digest()),
+		lines: make([]SourceLine, 0, content.Len()), states: make([]LineState, 0, content.Len()),
+	}
+	for line := range content.All() {
+		d.lines = append(d.lines, SourceLine{
+			index: line.Number - 1, raw: line.Raw,
+			indent: len(line.Raw) - len(strings.TrimLeft(line.Raw, " \t")),
+		})
+		d.states = append(d.states, LinePending)
+	}
+	return d, nil
 }
 
 // Content returns the explicit original configuration text.

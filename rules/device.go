@@ -37,7 +37,7 @@ func DeviceRules() []assess.Rule[*fabric.Device] {
 	return append([]deviceRule{
 		evidenceIncomplete, configRelation, aclUndefined, nveShutdown,
 		nveVNIDown, nvePeerDown, bgpSessionDown, bgpNoPrefixes, ospfNotFull,
-		vpcPeer, vpcMember, portChannelMember,
+		vpcPeer, vpcMember, portChannelMember, bgpCapabilityGap, configuredInterfaceDown,
 	}, operationDeviceRules()...)
 }
 
@@ -239,10 +239,11 @@ var bgpNoPrefixes = stateRule("vxlan.bgp_no_prefixes", "BGP EVPN 会话已建立
 
 var ospfNotFull = stateRule("vxlan.ospf_neighbor_not_full", "Underlay OSPF 邻居未达到 FULL", assess.SeverityHigh, fabric.DimOSPF, func(d *fabric.Device) []assess.Finding {
 	var out []assess.Finding
+	interfaces := configuredInterfaces(d)
 	for _, n := range d.OSPFNeighbors {
 		state, _, _ := strings.Cut(strings.ToLower(n.State), "/")
 		// 2WAY is the steady state between DROTHERs on broadcast segments.
-		if state == "full" || state == "2way" {
+		if state == "full" || state == "2way" && !pointToPointOSPF(interfaces, n) {
 			continue
 		}
 		out = append(out, assess.Finding{Subject: device(d).Child("ospf_process", n.Process).Child("neighbor", n.NeighborID),
@@ -270,6 +271,11 @@ var vpcPeer = stateRule("vxlan.vpc_peer_unhealthy", "vPC 对等体、keepalive �
 	check("peer_status", v.PeerStatus, "peer adjacency formed ok")
 	check("keepalive_status", v.KeepaliveStatus, "peer is alive")
 	check("consistency_status", v.ConsistencyStatus, "success")
+	for _, name := range []string{"Per-vlan consistency status", "Type-2 consistency status"} {
+		if strings.EqualFold(v.Attributes[name], "failed") {
+			check(name, v.Attributes[name], "success")
+		}
+	}
 	for _, l := range v.PeerLinks {
 		if !strings.EqualFold(l.State, "up") {
 			out = append(out, assess.Finding{Subject: subject.Child("peer_link", l.Interface), Actual: l.State, Expected: "up"})
@@ -289,20 +295,18 @@ var vpcMember = stateRule("vxlan.vpc_member_inconsistent", "vPC 成员接口 dow
 			continue
 		}
 		out = append(out, assess.Finding{Subject: device(d).Child("vpc", m.ID.String()).Child("interface", m.Interface),
-			Actual: map[string]string{"state": m.State, "consistency": m.Consistency, "reason": m.Reason}})
+			Actual: m})
 	}
 	return out
 })
 
 var portChannelMember = stateRule("vxlan.port_channel_member_down", "Port-channel 成员未绑定 (非 P 状态)", assess.SeverityMedium, fabric.DimPortChannels, func(d *fabric.Device) []assess.Finding {
 	var out []assess.Finding
+	interfaces := configuredInterfaces(d)
 	for _, pc := range d.PortChannels {
-		// Only bundles that are up are expected to carry every member.
-		if !strings.Contains(pc.Flags, "U") {
-			continue
-		}
 		for _, m := range pc.Members {
-			if !strings.Contains(m.Flags, "P") {
+			upBundle := strings.Contains(pc.Flags, "U") && !strings.Contains(m.Flags, "P")
+			if upBundle || configuredDownMember(interfaces, pc, m) {
 				out = append(out, assess.Finding{Subject: device(d).Child("port_channel", pc.Interface).Child("member", m.Interface), Actual: m.Flags, Expected: "P"})
 			}
 		}

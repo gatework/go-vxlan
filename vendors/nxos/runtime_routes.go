@@ -9,19 +9,35 @@ import (
 
 const rtRouteHeader = `(?i)Topology ID|Topology|Mac Address|Host IP|Prod|Flags|Seq No|Next-Hops|Next Hop \(s\)|Next Hop\(s\)`
 
-func (p *rtParser) routes(text string) {
+func (p *rtParser) routes(text runtimeText) {
 	labels := map[string]string{"topology": "topology_id", "topology id": "topology_id", "mac address": "mac", "host ip": "host_ip", "prod": "producer", "flags": "flags", "seq no": "sequence", "next-hops": "next_hops", "next hop (s)": "next_hops", "next hop(s)": "next_hops"}
 	var fields []string
 	var previous vxlan.Record
 	var hopIndex map[string]bool
-	for i, source := range strings.Split(text, "\n") {
-		line := rtTrim(source)
-		n := i + 1
-		if line == "" || rtMatch(`^[-=\s]+$`, line) || rtMatch(`^(?:(?:NH\s+)?Flags\s*-\s*)?(?:\([A-Za-z0-9]+\):[A-Za-z0-9 ,/-]+\s*)+$`, line) {
+	var headerWidths []int
+	awaitingSeparator, emptyTable := false, false
+	for _, source := range text {
+		line := rtTrim(source.text)
+		n := source.first
+		if line == "" {
+			continue
+		}
+		if rtMatch(`^[-=\s]+$`, line) {
+			if awaitingSeparator {
+				emptyTable = rtEmptyRouteRuler(line, fields, headerWidths)
+				awaitingSeparator = false
+			}
+			continue
+		}
+		awaitingSeparator = false
+		if rtMatch(`^(?:(?:NH\s+)?Flags\s*-\s*)?(?:\([A-Za-z0-9]+\):[A-Za-z0-9 ,/-]+\s*)+$`, line) {
 			continue
 		}
 		if rtMatch(`(?i)^Topology\b`, line) {
 			fields = p.routeHeaderFields(line, n, labels)
+			headerWidths = rtRouteHeaderWidths(line)
+			emptyTable = false
+			awaitingSeparator = fields != nil
 			previous = nil
 			continue
 		}
@@ -43,7 +59,7 @@ func (p *rtParser) routes(text string) {
 				p.rows = append(p.rows, route)
 				valid = true
 			}
-		} else if previous != nil && len(source) > 0 && (source[0] == ' ' || source[0] == '\t') {
+		} else if previous != nil && len(source.text) > 0 && (source.text[0] == ' ' || source.text[0] == '\t') {
 			if hops, ok := rtNextHops(line); ok {
 				hopIndex = rtAppendRouteHops(previous, hops, hopIndex)
 				valid = true
@@ -54,6 +70,9 @@ func (p *rtParser) routes(text string) {
 			p.unparsed(n)
 		}
 	}
+	// A recognized, fully ruled table is NX-OS's zero-row form. This proof
+	// applies only after complete transport and with no rejected body lines.
+	p.acceptEmptyRouteTable(emptyTable)
 }
 func rtHopKey(r vxlan.Record) string {
 	return rtKey(r, []string{"address", "interface", "local", "ifindex", "label"})
@@ -229,4 +248,32 @@ func (p *rtParser) routeLine(fields []string, line string) (vxlan.Record, bool) 
 		row[key] = values[i]
 	}
 	return p.routeFields(row)
+}
+
+func rtEmptyRouteRuler(line string, fields []string, widths []int) bool {
+	columns := rtWords(line)
+	valid := len(columns) == len(widths)
+	for i, column := range columns {
+		if i >= len(widths) || len(column) < widths[i] || strings.Trim(column, "-") != "" {
+			valid = false
+		}
+	}
+	// Older NX-OS IPv4 MAC-IP output omits one ruler segment.
+	legacyHeader := strings.Join(fields, ",") == "topology_id,mac,host_ip,producer,flags,sequence,next_hops"
+	legacyRuler := strings.Join(columns, " ") == "----------- -------------- --------------- ------ ---------- ---------------"
+	return valid || legacyHeader && legacyRuler
+}
+
+func rtRouteHeaderWidths(line string) []int {
+	widths := []int{}
+	for _, label := range rtRE(rtRouteHeader).FindAllString(strings.Join(rtWords(line), " "), -1) {
+		widths = append(widths, len(label))
+	}
+	return widths
+}
+
+func (p *rtParser) acceptEmptyRouteTable(recognized bool) {
+	if recognized && len(p.rows) == 0 && len(p.issues) == 0 {
+		p.empty = true
+	}
 }

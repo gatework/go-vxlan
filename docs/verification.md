@@ -105,3 +105,13 @@ diff -qr "$vxlan_go/testdata" "$vxlan_oracle/testdata"
 ## v0.3.1 本地候选检查
 
 正式 Connector v0.6.0 / Expect v0.5.0；Go 1.27.3 race/shuffle、vet、govulncheck 与独立交付检查通过，Go 1.26.0 全包兼容性测试通过。独立交付包含四平台构建、源码消费者和安装后离线 CLI。以上结果不代替同提交 CI、发行附件校验及正式标签消费者。
+
+## v0.5.0 发布候选核验
+
+候选以 v0.4.0 的类型化 fabric/rules 和正式依赖升级为基础整合 Parser，不将旧工作区的旧领域 API 覆盖到发布源码。make check 通过，包含格式、lint、架构、全包 race/shuffle、漏洞扫描、模块及独立交付检查；发布脚本两组14项回归分别通过。独立交付涵盖 Linux/macOS × amd64/arm64、外部类型化库消费者和安装后CLI。
+
+对83台历史设备的1,101次响应做本地 Connector/adapter 回放，再通过 CollectSession 和类型化文档解码检查。935份业务观测仍为934 complete、1 partial，collection 为82 complete、1 partial；83份 BGP 汇总进入类型化模型。运行态事实、状态和诊断与开发候选一致；配置记录除 v0.4.0 已发布的 operations 扩展外一致，配置指纹不变。规则评估保留6项 BGP capable 差额、6项角色接口复核、2项 vPC 一致性异常及150个 down* 成员，新增项没有可执行 change。
+
+Parser 运行态物理行、配置原文/摘要、来源五态和原 Ruby 金样继续验证。BGP 跨段冲突、数量下限、精确大整数、Port-channel 数字身份及配置关联边界有针对性回归。剩余 NVE peer 回显正文为空，配置不足以恢复实时邻居；保持 partial。
+
+上述为隔离候选本地证据；远程CI、同提交制品和正式附件须按 RELEASING.md 另行读回，不以离线回放代替新版实机、业务连通性或生产写入验收。

@@ -116,6 +116,10 @@ func (s *cfgState) leaf(b *cfgBlock) {
 	}
 }
 
+var cfgIncomplete = regexp.MustCompile(`(?i)--[ \t]*More[ \t]*--|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]`)
+var cfgUnsupported = regexp.MustCompile(`^(?:interface|vlan|vrf|router|vpc|evpn|feature|ip prefix-list|ipv6 prefix-list|route-map)\b`)
+var cfgError = regexp.MustCompile(`(?i)^(?:%|ERROR:|Invalid command|--More--)`)
+
 var cfgModeled = regexp.MustCompile(`^(?:no )?(?:hostname|interface|vlan|vrf|router|vpc|evpn|feature|object-group|ip address|ip router ospf|ip access-group|ip prefix-list|ipv6 prefix-list|ip access-list|route-map|vn-segment|member vni|route-target|channel-group|fabric forwarding|mtu|ip unnumbered|ip ospf network|switchport mode|switchport access vlan|ip forward|ipv6 address)\b`)
 
 func (s *cfgState) unhandled(b *cfgBlock) {
@@ -145,8 +149,16 @@ func (s *cfgState) ignore(b *cfgBlock) {
 }
 func cfgDocument(text string, document *ConfigurationDocument) ([]*cfgBlock, []vxlan.Record, string) {
 	if document == nil {
-		document = newConfigurationDocument(text)
+		var err error
+		document, err = newConfigurationDocument(text)
+		if err != nil {
+			return nil, []vxlan.Record{{"code": "configuration_index_failed"}}, ""
+		}
 	}
+	return scanConfigDocument(document)
+}
+
+func scanConfigDocument(document *ConfigurationDocument) ([]*cfgBlock, []vxlan.Record, string) {
 	roots := []*cfgBlock{}
 	stack := []*cfgBlock{}
 	issues := []vxlan.Record{}
@@ -170,7 +182,7 @@ func cfgDocument(text string, document *ConfigurationDocument) ([]*cfgBlock, []v
 			banner = cfgBannerDelimiter(m[1])
 			continue
 		}
-		if regexp.MustCompile(`(?i)--[ \t]*More[ \t]*--|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]`).MatchString(raw) {
+		if cfgIncomplete.MatchString(raw) {
 			document.states[i] = LineInvalid
 			issues = append(issues, vxlan.Record{"code": "incomplete_configuration", "line": i + 1})
 			continue
@@ -315,9 +327,9 @@ func (s *cfgState) block(b *cfgBlock, d vxlan.Record) {
 		s.leaf(b)
 	} else if m = textparse.Match(`fabric forwarding anycast-gateway-mac (\S+)`, t); m != nil {
 		s.blockAnycastMAC(b, d, m[1])
-	} else if regexp.MustCompile(`^(?:interface|vlan|vrf|router|vpc|evpn|feature|ip prefix-list|ipv6 prefix-list|route-map)\b`).MatchString(t) {
+	} else if cfgUnsupported.MatchString(t) {
 		s.issue(b, "unsupported_configuration")
-	} else if regexp.MustCompile(`(?i)^(?:%|ERROR:|Invalid command|--More--)`).MatchString(t) {
+	} else if cfgError.MatchString(t) {
 		s.issue(b, "invalid_command_output")
 	} else {
 		s.unhandled(b)

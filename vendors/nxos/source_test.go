@@ -1,6 +1,7 @@
 package nxos
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -228,5 +229,24 @@ func TestSourceInspectionAndCopies(t *testing.T) {
 	data["addresses"].([]string)[0] = "changed"
 	if len(good.CapturesFor("interfaces", "Vlan10")) != 1 || capture.Data().(vxlan.Record)["addresses"].([]string)[0] != "10.0.0.1/24" {
 		t.Fatal("capture snapshot aliased")
+	}
+}
+
+func TestSourceSharedTextIndex(t *testing.T) {
+	for _, text := range []string{"", "hostname LEAF", "hostname LEAF\n", "hostname LEAF\r\n! comment\r\n", "hostname LEAF\r! comment\n\r\n"} {
+		_, d := parseSource(t, text)
+		if d.Content() != text || d.Checksum() != fmt.Sprintf("%x", sha256.Sum256([]byte(text))) {
+			t.Fatal("physical source or checksum changed")
+		}
+		var joined strings.Builder
+		for i, line := range d.Lines() {
+			joined.WriteString(line.Content())
+			if line.Index() != i || line.Number() != i+1 {
+				t.Fatal("physical line numbering changed")
+			}
+		}
+		if joined.String() != text {
+			t.Fatal("line terminators or final line changed")
+		}
 	}
 }

@@ -418,9 +418,10 @@ func captureProvenance(o vxlan.Observation, c Capture, cmd string, started, ende
 	if c.CompletedAt != nil {
 		o.CompletedAt = new(*c.CompletedAt)
 	}
-	o.Evidence = record.CopyRecords(c.Evidence)
-	if c.Complete && len(o.Evidence) == 0 {
-		o.Evidence = []vxlan.Record{{"command": cmd, "sha256": fmt.Sprintf("%x", sha256.Sum256([]byte(c.Body))), "bytes": len(c.Body), "observed_at": ended.Format("2006-01-02T15:04:05.000000Z")}}
+	receipts := record.CopyRecords(c.Evidence)
+	if c.Complete && len(receipts) == 0 {
+		receipts = []vxlan.Record{{"command": cmd, "sha256": fmt.Sprintf("%x", sha256.Sum256([]byte(c.Body))), "bytes": len(c.Body), "observed_at": ended.Format("2006-01-02T15:04:05.000000Z")}}
 	}
+	o.Evidence = append(record.CopyRecords(o.Evidence), receipts...)
 	return o
 }

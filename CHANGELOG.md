@@ -4,7 +4,9 @@
 
 - Adopt the published net-connector v0.9.0 module path and go-netops v0.4.0.
 - Rename shared inventory platform filters, overrides and device-rule destinations to match Connector.
-- Preserve transport receipt, cleanup failure and change-safety contracts.
+- Share Parser content indexing across NX-OS configuration and runtime output; retain physical source lines and recognize complete empty L2route tables.
+- Preserve scoped BGP summary evidence through collection and typed Fabric decoding; reject conflicting summaries, missing capable-peer rows and inconsistent Port-channel identities.
+- Extend read-only runtime assessments while preserving transport receipts, typed APIs and change-safety contracts.
 
 ## v0.4.0
 

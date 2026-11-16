@@ -102,3 +102,9 @@ apply 的可变执行事实由私有 `executionState` 持有：状态、pending 
 `change` 中的 `SVIGateway`、`VLANVNI`、`SVIACL` 实现 go-netops `change.Change` 与 `Preserving`：命令、回退、准入（Eligible）、回读（Satisfied）与"除目标外配置未变"（Preserved）均与旧 `ChangePlan` 一致。`rules.Increments` 复现旧 Fabric 审查的增量推导（网关、ACL、缺失 VLAN 映射；承载冲突、网段冲突、角色冲突与缺少验证命令时不推导），审查流程据此生成 `plan.json` 的 `changes`，计划 ID、字段与执行计划校验不变；`assessment.json` 以 `vxlan.remediation_increment` 发现项附带候选修复。
 
 类型化模型保留字段存在性：显式 false、空列表/空映射与缺失字段不同，回读保护与旧实现同样严格。等价性由三层测试保证：build/eligible/satisfied 金样；以金样为种子的 7425 次配置变异差分；Fabric 金样与真实配置（`VXLAN_REAL_CORPUS`）上 `plan.json` changes 与旧推导逐字节一致。旧推导保留在测试中作为参照，直至旧审查下线。
+
+## 统一文本与 BGP 汇总
+
+NX-OS 配置来源和命令回显通过正式 Parser v0.2.2 的 Content 共享物理行与原文摘要；厂商语法、来源五态、规范化 config_digest 和命令空表证明仍由 vendors/nxos 维护。折行及多 scope 处理保留正文物理行范围，不通过去掉分页或控制字符补造完整事实。
+
+BGP 汇总存于 Observation.Evidence；collect 将解析证据与传输回执分别复制并共同保留。fabric.Observed.Evidence / Device.BGPSummaries 为类型化入口，rules 使用同一 scope 的精确计数生成只读复核项。未知汇总字段使 BGP 维度 partial；没有重新引入旧 review 包或 Record 业务规则。

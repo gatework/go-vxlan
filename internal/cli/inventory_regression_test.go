@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gatework/go-net-connector/netdisco"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
+	"github.com/gatework/net-connector/netdisco"
 )
 
 func TestInventoryNamespaceAndCacheMigration(t *testing.T) {
@@ -70,7 +70,9 @@ func TestInventoryNamespaceAndCacheMigration(t *testing.T) {
 }
 
 func TestDeliveryReviewerDeviceRules(t *testing.T) {
+	var requests atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
 		if r.URL.Query().Get("offset") != "0" {
 			w.Write([]byte(`[]`))
 			return
@@ -79,7 +81,7 @@ func TestDeliveryReviewerDeviceRules(t *testing.T) {
 	}))
 	defer srv.Close()
 	dir := t.TempDir()
-	config := vxlan.Record{"netdisco": vxlan.Record{"url": srv.URL, "allow_insecure_http": true, "cache_enabled": false}, "inventory": vxlan.Record{"device_rules": []any{vxlan.Record{"vendor": "OEM", "connector": "cisco_nxos"}}}}
+	config := vxlan.Record{"netdisco": vxlan.Record{"url": srv.URL, "allow_insecure_http": true, "cache_enabled": false}, "inventory": vxlan.Record{"device_rules": []any{vxlan.Record{"vendor": "OEM", "platform": "cisco_nxos"}}}}
 	b, _ := json.Marshal(config)
 	os.WriteFile(filepath.Join(dir, "vxlan.yml"), b, 0600)
 	c, e := bootstrap.Load(t.Context(), bootstrap.ConfigOptions{CWD: dir, Home: dir, Directories: []string{dir}, Environment: map[string]string{"ND_API_KEY": "test"}})
@@ -93,6 +95,15 @@ func TestDeliveryReviewerDeviceRules(t *testing.T) {
 	}
 	if len(rows) != 1 {
 		t.Fatalf("device_rules silently ignored: got %v; effective inventory %v", rows, c.Inventory)
+	}
+	requests.Store(0)
+	config["inventory"] = vxlan.Record{"device_rules": []any{vxlan.Record{"vendor": "OEM", "connector": "cisco_nxos"}}}
+	c, e = bootstrap.Load(t.Context(), bootstrap.ConfigOptions{CWD: dir, Home: dir, Directories: []string{}, Overrides: config})
+	if e == nil {
+		_, e = bootstrap.FetchInventory(t.Context(), c)
+	}
+	if e == nil || requests.Load() != 0 {
+		t.Fatal("legacy mapping destination reached inventory source", e, requests.Load())
 	}
 }
 func TestDeliveryReviewerInventoryCancellation(t *testing.T) {

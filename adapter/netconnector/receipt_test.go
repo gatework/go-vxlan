@@ -15,13 +15,13 @@ import (
 	"time"
 
 	expect "github.com/gatework/go-expect"
-	"github.com/gatework/go-net-connector/connector"
-	ncvendors "github.com/gatework/go-net-connector/vendors"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/parser"
 	"github.com/gatework/go-vxlan/vendors"
 	"github.com/gatework/go-vxlan/vendors/nxos"
+	"github.com/gatework/net-connector/connector"
+	ncvendors "github.com/gatework/net-connector/vendors"
 )
 
 const receiptCommand = "show running-config"

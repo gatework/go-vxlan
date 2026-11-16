@@ -62,6 +62,7 @@ type Device struct {
 	Configuration *Configuration                          `json:"configuration,omitempty"`
 	NVEPeers      []NVEPeer                               `json:"nve_peers,omitempty"`
 	NVEVNIs       []NVEVNI                                `json:"nve_vnis,omitempty"`
+	BGPSummaries  []BGPSummary                            `json:"bgp_summaries,omitempty"`
 	BGPNeighbors  []BGPNeighbor                           `json:"bgp_neighbors,omitempty"`
 	OSPFNeighbors []OSPFNeighbor                          `json:"ospf_neighbors,omitempty"`
 	CDPNeighbors  []CDPNeighbor                           `json:"cdp_neighbors,omitempty"`
@@ -79,9 +80,10 @@ type Device struct {
 // legacy record representation: a status, records as JSON objects and
 // issues as JSON objects.
 type Observed struct {
-	Status  evidence.Status
-	Records []json.RawMessage
-	Issues  []json.RawMessage
+	Status   evidence.Status
+	Records  []json.RawMessage
+	Issues   []json.RawMessage
+	Evidence []json.RawMessage
 }
 
 // NewDevice decodes observed dimensions into a typed device. Unknown
@@ -105,6 +107,11 @@ func NewDevice(id Identity, dims map[evidence.Dimension]Observed) *Device {
 		}
 		if err := d.decode(dim, o.Records); err != nil {
 			issues = append(issues, evidence.Issue{Code: IssueUnmodeled, Detail: err.Error()})
+		}
+		if dim == DimBGP {
+			if err := d.decodeBGPSummaries(o.Evidence); err != nil {
+				issues = append(issues, evidence.Issue{Code: IssueUnmodeled, Detail: err.Error()})
+			}
 		}
 		if slices.ContainsFunc(issues, func(i evidence.Issue) bool { return i.Code == IssueUnmodeled }) && status == evidence.StatusComplete {
 			status = evidence.StatusPartial
@@ -245,7 +252,7 @@ func decodeIssueField(issue *evidence.Issue, k string, v any) error {
 			return fmt.Errorf("issue count")
 		}
 		issue.Count = n
-	case "expected", "observed", "parsed":
+	case "expected", "expected_minimum", "observed", "parsed", "group":
 		n, ok := issueInteger(v)
 		if !ok {
 			// Device-declared totals can exceed int; keep the exact digits.
@@ -256,11 +263,7 @@ func decodeIssueField(issue *evidence.Issue, k string, v any) error {
 			issue.Detail = strings.TrimSpace(issue.Detail + " " + k + "=" + digits.String())
 			return nil
 		}
-		if k == "expected" {
-			issue.Expected = &n
-		} else {
-			issue.Observed = &n
-		}
+		assignIssueCount(issue, k, n)
 	case "field":
 		s, _ := v.(string)
 		issue.Fields = append(issue.Fields, s)
@@ -284,4 +287,40 @@ func decodeIssueField(issue *evidence.Issue, k string, v any) error {
 		issue.Scope[k] = s
 	}
 	return nil
+}
+
+func (d *Device) decodeBGPSummaries(records []json.RawMessage) error {
+	summaries := []BGPSummary{}
+	for _, raw := range records {
+		var metadata struct {
+			Kind string `json:"kind"`
+		}
+		if err := json.Unmarshal(raw, &metadata); err != nil {
+			return err
+		}
+		if metadata.Kind != "bgp_summary" {
+			continue
+		}
+		var summary BGPSummary
+		if err := strict(raw, &summary); err != nil {
+			return err
+		}
+		summaries = append(summaries, summary)
+	}
+	d.BGPSummaries = summaries
+	return nil
+}
+
+func assignIssueCount(issue *evidence.Issue, key string, count int) {
+	switch key {
+	case "expected", "expected_minimum":
+		issue.Expected = &count
+	case "group":
+		if issue.Scope == nil {
+			issue.Scope = map[string]string{}
+		}
+		issue.Scope[key] = strconv.Itoa(count)
+	default:
+		issue.Observed = &count
+	}
 }

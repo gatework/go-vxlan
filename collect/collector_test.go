@@ -267,3 +267,51 @@ func testProfile() *parser.Profile {
 	}
 	return profile
 }
+
+func TestCollectPreservesParserAndTransportEvidence(t *testing.T) {
+	for _, withReceipt := range []bool{false, true} {
+		t.Run(fmt.Sprintf("receipt=%t", withReceipt), func(t *testing.T) {
+			parserEvidence := []vxlan.Record{{"kind": "bgp_summary", "configured_peers": int64(2)}}
+			receiptEvidence := []vxlan.Record{}
+			if withReceipt {
+				receiptEvidence = append(receiptEvidence, vxlan.Record{"sha256": "wire", "bytes": 5})
+			}
+			registry, err := parser.NewRegistry(map[string]parser.ProfileSpec{"fixture": {
+				Queries: []parser.QuerySpec{{Dimension: "bgp_neighbors", Command: "show peers", Parse: func(string, bool) (vxlan.Observation, error) {
+					return vxlan.NewObservation("bgp_neighbors", "complete", nil, nil, parserEvidence)
+				}}},
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			profile, err := registry.Fetch("fixture", "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot, err := CollectSession(t.Context(), readSession(func(context.Context, string) (Capture, error) {
+				return Capture{Body: "body\n", Complete: true, Evidence: receiptEvidence}, nil
+			}), Request{Target: vxlan.Record{}, Profile: profile, Dimensions: []string{"bgp_neighbors"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := snapshot.Dimensions["bgp_neighbors"]
+			if !got.Complete() || len(got.Evidence) != 2 || got.Evidence[0]["kind"] != "bgp_summary" {
+				t.Fatalf("parser evidence was lost: %v", got.Evidence)
+			}
+			if withReceipt {
+				if got.Evidence[1]["sha256"] != "wire" {
+					t.Fatalf("wire evidence lost: %v", got.Evidence)
+				}
+			} else if got.Evidence[1]["sha256"] == nil || got.Evidence[1]["command"] != "show peers" {
+				t.Fatalf("parser metadata suppressed fallback receipt: %v", got.Evidence)
+			}
+			parserEvidence[0]["kind"] = "changed"
+			if withReceipt {
+				receiptEvidence[0]["sha256"] = "changed"
+			}
+			if got.Evidence[0]["kind"] != "bgp_summary" || withReceipt && got.Evidence[1]["sha256"] != "wire" {
+				t.Fatal("evidence aliases parser or transport values")
+			}
+		})
+	}
+}

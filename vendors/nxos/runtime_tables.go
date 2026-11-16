@@ -7,7 +7,7 @@ import (
 	vxlan "github.com/gatework/go-vxlan"
 )
 
-func (p *rtParser) interfaces(text string) {
+func (p *rtParser) interfaces(text runtimeText) {
 	layout := ""
 	p.lines(text, false, func(line string, n int) {
 		if rtMatch(`(?i)^(?:Port\s+VRF\s+Status\s+IP Address(?:\s+Speed\s+MTU)?|(?:Port|Interface)\s+Name\s+Status\s+Vlan\s+Duplex\s+Speed\s+Type|(?:Ethernet|Port-channel)\s+VLAN\s+Type\s+Mode\s+Status\s+Reason\s+Speed\s+(?:Port|Protocol)|Interface\s+Status\s+Description|Interface\s+Secondary VLAN\(Type\)\s+Status Reason|Port\s+Status Reason\s+MTU)$`, line) {
@@ -54,7 +54,7 @@ func (p *rtParser) members(text string) []vxlan.Record {
 	}
 	return out
 }
-func (p *rtParser) ports(text string) {
+func (p *rtParser) ports(text runtimeText) {
 	totals := []any{}
 	var previous vxlan.Record
 	p.lines(text, false, func(line string, n int) {
@@ -66,6 +66,14 @@ func (p *rtParser) ports(text string) {
 			previous = nil
 			return
 		} else if m := rtFind(`(?i)^(\d+)\s+(Po\d+)\(([^\s()]+)\)\s+(\S+)\s+(\S+)\s*(.*)$`, line); m != nil {
+			if !rtEqualNumber(rtNum(m[1]), m[2][2:]) {
+				p.issues = append(p.issues, vxlan.Record{
+					"code": "port_channel_identity_mismatch", "line": n,
+					"group": rtNum(m[1]), "interface": m[2],
+				})
+				previous = nil
+				return
+			}
 			previous = vxlan.Record{"group": rtNum(m[1]), "interface": m[2], "flags": m[3], "type": m[4], "protocol": m[5], "members": p.members(m[6])}
 			p.rows = append(p.rows, previous)
 		} else if rtMatch(`(?i)^(?:Eth(?:ernet)?\S+\([^)]+\)\s*)+$`, line) && previous != nil {
@@ -110,7 +118,7 @@ func (p *rtParser) ports(text string) {
 	}
 }
 
-func (p *rtParser) macs(text string) {
+func (p *rtParser) macs(text runtimeText) {
 	p.lines(text, false, func(line string, n int) {
 		if rtMatch(`(?i)^VLAN\s+MAC Address\s+Type\s+age\s+Secure\s+NTFY\s+Ports$`, line) {
 			p.header = true

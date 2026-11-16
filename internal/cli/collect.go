@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/gatework/go-net-connector/netdisco"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/bootstrap"
 	"github.com/gatework/go-vxlan/internal/record"
 	"github.com/gatework/go-vxlan/internal/workflow"
+	"github.com/gatework/net-connector/netdisco"
 )
 
 func (a *App) collect(ctx context.Context, f *pflag.FlagSet) int {

@@ -9,10 +9,10 @@ import (
 	"time"
 
 	expect "github.com/gatework/go-expect"
-	"github.com/gatework/go-net-connector/connector"
-	"github.com/gatework/go-net-connector/vendors"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/collect"
+	"github.com/gatework/net-connector/connector"
+	"github.com/gatework/net-connector/vendors"
 )
 
 // Session borrows one connector operation for synchronous capture.

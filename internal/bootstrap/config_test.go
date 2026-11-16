@@ -25,7 +25,7 @@ func TestConfigLayers(t *testing.T) {
 	}
 }
 func TestConfigStrict(t *testing.T) {
-	for _, body := range []string{"", "# comment only\n", "null\n", "~\n", "---\n", "parallel: 2\nparallel: 3\n", "devices: &x []\ndimensions: *x\n", "devices: []\n---\nparallel: 2\n", "password: secret\n", "ssh:\n  password: secret\n", "devices:\n - host: 192.0.2.1\n - host: 192.0.2.1\n"} {
+	for _, body := range []string{"", "# comment only\n", "null\n", "~\n", "---\n", "parallel: 2\nparallel: 3\n", "devices: &x []\ndimensions: *x\n", "devices: []\n---\nparallel: 2\n", "password: secret\n", "ssh:\n  password: secret\n", "inventory: {include_vendors: [cisco_nxos]}\n", "inventory: {vendor_overrides: {Cisco: cisco_nxos}}\n", "devices:\n - host: 192.0.2.1\n - host: 192.0.2.1\n"} {
 		t.Run(body, func(t *testing.T) {
 			d := t.TempDir()
 			os.WriteFile(filepath.Join(d, "vxlan.yml"), []byte(body), 0600)

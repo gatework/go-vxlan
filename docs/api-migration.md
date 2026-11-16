@@ -1,3 +1,11 @@
+# v0.5.0 Connector 依赖迁移
+
+运行依赖改为正式 `github.com/gatework/net-connector v0.9.0`、`go-expect v0.6.0` 与 `go-netops v0.4.0`；不再使用旧 `go-net-connector` 模块路径。
+
+共享清单配置须按 Connector 当前平台术语迁移：`include_vendors` / `exclude_vendors` 改为 `include_platforms` / `exclude_platforms`，`vendor_overrides` 改为 `platform_overrides`，`device_rules[].connector` 改为 `device_rules[].platform`。对应环境变量改为 `NC_INCLUDE_PLATFORMS`、`NC_EXCLUDE_PLATFORMS`、`NC_PLATFORM_OVERRIDES`。规则中的 `vendor` 仍匹配清单来源厂商标识；目标平台使用 `platform`。旧配置键会在连接前拒绝。
+
+VXLAN 的领域 API、设备命令、证据、计划 schema 与执行安全边界保持不变。直接向 `adapter/netconnector.Open` 传入连接配置的 Go 调用方应更新 Connector 导入路径；上游类型改用新模块中的同名 API。
+
 # v0.4.0 类型化业务 API 迁移
 
 本版本采用 `fabric` 类型化模型、go-netops v0.3.0 的规则引擎与类型化变更契约。Go 调用者需迁移至类型化模型与规则接口；CLI 新生成的计划使用 schema 3，执行层继续接受通过相同严格校验的 schema 2 计划。任何配置变化仍会使计划过期。
@@ -181,3 +189,13 @@ Ruby 金样与实测边界见 [兼容矩阵](compatibility.md) 和 [验证说明
 输出：`plan.json` schema 3 去掉 `audits` 与 `fabric`（改见 `assessment.json`），`summary.json` 的 `counts` 改为 `increments` 与 `risk_counts`，`layout_version` 4；采集证据文档的 `recommendations` 改为 `assessment`。`apply` 同时接受 schema 2 与 3 的计划。
 
 `configuration` 中的 `ACLRules`、`ResolveACLPolicy`、`ACLBindings`、`AddressGroupReferences`、`ServiceCatalog`、`CatalogForHosts`、`EffectiveNVEMember`、`ServiceRouteTargets`、`ServiceTenant`、`ServiceMappingSignature`、`Network`、`Overlap`、`NewSubnetIndex`、`BGPNeighbors`、`PrefixListReferences` 已删除；替代为 `fabric.OrderedRules`、`Configuration.ResolveACL`、`Configuration.Services`、`EffectiveMember`、`ExpandRouteTargets`、`Tenant`、`fabric.NewSubnetIndex`（`BGPNeighbors`/`PrefixListReferences` 无规则使用，不再提供）。ACL 序号上限 4294967295 现在同样作用于类型化增量。
+
+## v0.5.0 解析与运行态评估
+
+公开解析函数签名保持。运行态 issues[].line 改为正文的一基物理行号，LF/CRLF、折行与多 VRF 不再压缩或重置行号。完整已知 L2route 表头及分隔线可证明零记录，空白响应仍需配置缺席或明确零记录依据。
+
+BGP 汇总新增 kind=bgp_summary 的 evidence，包含 vrf、address_family、table_version、物理 line，以及命令提供时的 configured_peers / capable_peers。collect 按解析证据、传输回执顺序保留两者；调用方不得假设每条 evidence 都是传输摘要。fabric.Observed 新增 Evidence，Device 新增 BGPSummaries；DecodeDocument 同时解码汇总及邻居，精确计数使用 Counter，缺失计数为 nil。
+
+冲突汇总、低于 capable 数量下限的邻居行、Group/Po 号不一致分别产生 conflicting_bgp_summary、bgp_summary_peer_count_mismatch、port_channel_identity_mismatch。capable 不是精确行数，Idle 邻居也可出现在表格中；数量异常不会补造邻居事实。
+
+新增或扩展的 rules 只报告风险，不携带可执行 change。vPC 成员事实保留经 peer-link 转发及 VLAN 截断信息；广播 OSPF 2WAY 保持合法，明确配置为 point-to-point 的 2WAY 才提示复核。接口和聚合的配置关联使用一次构建的索引，行政关闭与歧义接口不用于推导意图。

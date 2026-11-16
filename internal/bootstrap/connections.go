@@ -3,12 +3,12 @@ package bootstrap
 import (
 	"context"
 
-	"github.com/gatework/go-net-connector/connector"
 	"github.com/gatework/go-vxlan/adapter/netconnector"
 	"github.com/gatework/go-vxlan/collect"
 	"github.com/gatework/go-vxlan/internal/workflow/apply"
 	"github.com/gatework/go-vxlan/parser"
 	"github.com/gatework/go-vxlan/vendors"
+	"github.com/gatework/net-connector/connector"
 )
 
 // OpenFunc composes a transport configuration with a borrowing session opener.

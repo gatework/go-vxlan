@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	ncconfig "github.com/gatework/go-net-connector/config"
 	vxlan "github.com/gatework/go-vxlan"
 	"github.com/gatework/go-vxlan/internal/record"
+	ncconfig "github.com/gatework/net-connector/config"
 )
 
 func TestConfigurationReadBoundary(t *testing.T) {

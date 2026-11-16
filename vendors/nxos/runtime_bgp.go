@@ -12,13 +12,15 @@ import (
 
 const rtBGPScope = `^BGP summary information for VRF (\S+), address family (.+)$`
 const rtBGPRouter = `^BGP router identifier (\S+), local AS number (\S+)$`
+const rtBGPSummary = `(?i)^BGP table version is (\d+)(?:, L2VPN EVPN config peers (\d+), capable peers (\d+))?$`
 
-func (p *rtParser) bgp(text string) {
+func (p *rtParser) bgp(text runtimeText) {
 	scope := vxlan.Record{}
 	var columns []string
 	total := false
 	seen := map[int]bool{}
 	peers := map[string]int{}
+	summary := bgpSummaryState{}
 	p.lines(text, false, func(line string, n int) {
 		if rtMatch(`(?i)^Neighbor\s+V\s+AS\s+MsgRcvd\s+MsgSent\s+TblVer\s+InQ\s+OutQ\s+Up/Down\s+State/PfxRcd$`, line) {
 			p.header = true
@@ -37,6 +39,12 @@ func (p *rtParser) bgp(text string) {
 			scope["local_as"] = m[2]
 			return
 		}
+		if m := rtFind(rtBGPSummary, line); m != nil {
+			if issue := summary.accept(scope, m, n); issue != nil {
+				p.issues = append(p.issues, issue)
+			}
+			return
+		}
 		if m := rtFind(`^Neighbor\s+T\s+AS\s+(?:(PfxRcd)\s+)?(Type-[1-9]\d*(?:\s+Type-[1-9]\d*)*)$`, line); m != nil {
 			total = m[1] != ""
 			columns = p.bgpColumns(m[2], n)
@@ -50,14 +58,16 @@ func (p *rtParser) bgp(text string) {
 			p.bgpPeer(m, scope, peers, n)
 			return
 		}
-		if !rtMatch(`(?i)^(?:BGP table version is \d+(?:, L2VPN EVPN config peers \d+, capable peers \d+)?|\d+ network entries and \d+ paths using \d+ bytes of memory|BGP attribute entries \[\d+/\d+\], BGP AS path entries \[\d+/\d+\]|BGP community entries \[\d+/\d+\], BGP clusterlist entries \[\d+/\d+\])$`, line) {
+		if !rtMatch(`(?i)^(?:\d+ network entries and \d+ paths using \d+ bytes of memory|BGP attribute entries \[\d+/\d+\], BGP AS path entries \[\d+/\d+\]|BGP community entries \[\d+/\d+\], BGP clusterlist entries \[\d+/\d+\])$`, line) {
 			p.unparsed(n)
 		}
 	})
 	if columns != nil && len(seen) != len(p.rows) {
 		p.issues = append(p.issues, vxlan.Record{"code": "missing_prefix_statistics", "expected": len(p.rows), "observed": len(seen)})
 	}
+	p.finishBGPSummary(summary.value)
 }
+
 func rtNumberString(v any) string { return rtTrim(rtString(v)) }
 func rtEqualNumber(v any, s string) bool {
 	a, ok := new(big.Int).SetString(rtNumberString(v), 10)
@@ -86,14 +96,14 @@ func rtRouterIdentity(router, asn string) (string, bool) {
 	}
 	return ip.String() + "/" + strconv.FormatUint(n, 10), true
 }
-func (p *rtParser) bgpIdentities(text string) {
+func (p *rtParser) bgpIdentities(text runtimeText) {
 	scope := vxlan.Record{}
 	identities := map[string]string{}
 	invalid := map[string]vxlan.Record{}
 	order := []string{}
 	scopeKey := "null"
-	for s := range strings.SplitSeq(text, "\n") {
-		line := rtTrim(s)
+	for _, source := range text {
+		line := rtTrim(source.text)
 		if m := rtFind(rtBGPScope, line); m != nil {
 			scope = vxlan.Record{"vrf": m[1], "address_family": m[2]}
 			scopeKey = rtKey(scope, []string{"vrf", "address_family"})
@@ -233,5 +243,96 @@ func (p *rtParser) bgpPeer(m []string, scope vxlan.Record, peers map[string]int,
 	key := rtKey(r, []string{"vrf", "address_family", "peer_ip"})
 	if _, ok := peers[key]; !ok {
 		peers[key] = len(p.rows) - 1
+	}
+}
+
+// Repeated VRF sections must not carry incompatible summaries. This runs after
+// merging sections as well as within each section, preserving first-source order.
+func (p *rtParser) bgpSummaryScopes() {
+	scopeFields := []string{"vrf", "address_family"}
+	counterFields := []string{"table_version", "configured_peers", "capable_peers"}
+	summaries := map[string]vxlan.Record{}
+	invalid := map[string]bool{}
+	for _, issue := range p.issues {
+		if issue["code"] == "conflicting_bgp_summary" {
+			invalid[rtKey(issue, scopeFields)] = true
+		}
+	}
+	for _, summary := range p.evidence {
+		if summary["kind"] != "bgp_summary" {
+			continue
+		}
+		key := rtKey(summary, scopeFields)
+		previous := summaries[key]
+		if previous != nil && rtKey(previous, counterFields) != rtKey(summary, counterFields) && !invalid[key] {
+			invalid[key] = true
+			p.issues = append(p.issues, vxlan.Record{
+				"code": "conflicting_bgp_summary", "line": summary["line"],
+				"vrf": summary["vrf"], "address_family": summary["address_family"],
+			})
+		}
+		summaries[key] = summary
+	}
+	out := []vxlan.Record{}
+	seen := map[string]bool{}
+	for _, evidence := range p.evidence {
+		if evidence["kind"] == "bgp_summary" {
+			key := rtKey(evidence, scopeFields)
+			if invalid[key] || seen[key] {
+				continue
+			}
+			seen[key] = true
+		}
+		out = append(out, evidence)
+	}
+	p.evidence = out
+}
+
+type bgpSummaryState struct {
+	value      vxlan.Record
+	conflicted bool
+}
+
+func (s *bgpSummaryState) accept(scope vxlan.Record, m []string, line int) vxlan.Record {
+	if scope["vrf"] == nil || scope["address_family"] != "L2VPN EVPN" || s.conflicted {
+		return nil
+	}
+	next := vxlan.Record{
+		"kind": "bgp_summary", "vrf": scope["vrf"], "address_family": scope["address_family"],
+		"table_version": rtNum(m[1]), "line": line,
+	}
+	if m[2] != "" {
+		next["configured_peers"] = rtNum(m[2])
+		next["capable_peers"] = rtNum(m[3])
+	}
+	fields := []string{"table_version", "configured_peers", "capable_peers"}
+	if s.value != nil && rtKey(s.value, fields) != rtKey(next, fields) {
+		s.conflicted = true
+		s.value = nil
+		return vxlan.Record{"code": "conflicting_bgp_summary", "line": line, "vrf": scope["vrf"], "address_family": scope["address_family"]}
+	}
+	if s.value == nil {
+		s.value = next
+	}
+	return nil
+}
+
+func (p *rtParser) finishBGPSummary(summary vxlan.Record) {
+	if summary != nil {
+		p.evidence = append(p.evidence, summary)
+		capable, ok := new(big.Int).SetString(rtNumberString(summary["capable_peers"]), 10)
+		observed := int64(len(p.rows))
+		// Idle/non-capable peers may also have rows. Capable peers are only a
+		// lower bound; configured_peers is never treated as an exact row count.
+		// Rejected rows already explain incompleteness; avoid cascading a second
+		// count diagnosis when the syntactic row population is not trustworthy.
+		canCountPeers := ok && len(p.issues) == 0
+		if canCountPeers && capable.Cmp(big.NewInt(observed)) > 0 {
+			p.issues = append(p.issues, vxlan.Record{
+				"code": "bgp_summary_peer_count_mismatch", "line": summary["line"],
+				"vrf": summary["vrf"], "address_family": summary["address_family"],
+				"expected_minimum": summary["capable_peers"], "observed": observed,
+			})
+		}
 	}
 }

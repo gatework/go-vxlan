@@ -38,6 +38,17 @@ type NVEVNI struct {
 	Flags          string `json:"flags"`
 }
 
+// BGPSummary retains scope-bound metadata without creating a neighbor row.
+type BGPSummary struct {
+	Kind            string   `json:"kind"`
+	VRF             string   `json:"vrf"`
+	AddressFamily   string   `json:"address_family"`
+	TableVersion    Counter  `json:"table_version"`
+	ConfiguredPeers *Counter `json:"configured_peers,omitempty"`
+	CapablePeers    *Counter `json:"capable_peers,omitempty"`
+	Line            int      `json:"line"`
+}
+
 // BGPNeighbor is one neighbor of "show bgp l2vpn evpn summary".
 type BGPNeighbor struct {
 	VRF              string             `json:"vrf"`

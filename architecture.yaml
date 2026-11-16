@@ -26,7 +26,7 @@ rules:
     transitive: true
   - name: domain packages do not depend on application or transport
     packages: [., ./parser/..., ./collect/..., ./configuration/..., ./change/..., ./vendors/..., ./fabric/..., ./rules/...]
-    deny: [./adapter/..., ./report/..., ./internal/cli/..., ./internal/bootstrap/..., ./internal/workflow/..., github.com/gatework/go-net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]
+    deny: [./adapter/..., ./report/..., ./internal/cli/..., ./internal/bootstrap/..., ./internal/workflow/..., github.com/gatework/net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]
     transitive: true
   - name: domain packages do no direct file or network IO
     packages: [., ./parser/..., ./collect/..., ./configuration/..., ./change/..., ./vendors/..., ./fabric/..., ./rules/...]
@@ -51,4 +51,4 @@ rules:
     only_local: [./fabric, ./change]
   - name: workflows do not import composition or transport
     packages: [./internal/workflow/...]
-    deny: [./internal/cli/..., ./internal/bootstrap/..., ./adapter/..., github.com/gatework/go-net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]
+    deny: [./internal/cli/..., ./internal/bootstrap/..., ./adapter/..., github.com/gatework/net-connector/..., github.com/gatework/go-expect/..., github.com/spf13/..., golang.org/x/term/...]

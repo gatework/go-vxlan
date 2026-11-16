@@ -15,9 +15,10 @@ type documentShape struct {
 	Device   Identity `json:"device"`
 	Snapshot struct {
 		Dimensions map[evidence.Dimension]struct {
-			Status  evidence.Status   `json:"status"`
-			Records []json.RawMessage `json:"records"`
-			Issues  []json.RawMessage `json:"issues"`
+			Status   evidence.Status   `json:"status"`
+			Records  []json.RawMessage `json:"records"`
+			Issues   []json.RawMessage `json:"issues"`
+			Evidence []json.RawMessage `json:"evidence"`
 		} `json:"dimensions"`
 	} `json:"snapshot"`
 }
@@ -38,7 +39,7 @@ func DecodeDocument(body []byte) (*Device, error) {
 		if !o.Status.Valid() {
 			return nil, fmt.Errorf("%w: dimension %s status", ErrDocument, name)
 		}
-		dims[name] = Observed{Status: o.Status, Records: o.Records, Issues: o.Issues}
+		dims[name] = Observed{Status: o.Status, Records: o.Records, Issues: o.Issues, Evidence: o.Evidence}
 	}
 	return NewDevice(doc.Device, dims), nil
 }

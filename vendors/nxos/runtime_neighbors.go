@@ -6,7 +6,7 @@ import (
 	vxlan "github.com/gatework/go-vxlan"
 )
 
-func (p *rtParser) cdp(text string) {
+func (p *rtParser) cdp(text runtimeText) {
 	c := cdpParser{parser: p, conflicts: map[string]bool{}, attributesConflicts: map[string]bool{}}
 	p.lines(text, true, c.line)
 	c.finish()
@@ -100,7 +100,7 @@ func (c *cdpParser) finish() {
 	c.parser.rows = valid
 }
 
-func (p *rtParser) vpc(text string) {
+func (p *rtParser) vpc(text runtimeText) {
 	v := vpcParser{parser: p, values: vxlan.Record{"attributes": vxlan.Record{}, "peer_links": []vxlan.Record{}, "members": []vxlan.Record{}}, labels: map[string]string{"vPC domain id": "domain_id", "Peer status": "peer_status", "vPC keep-alive status": "keepalive_status", "Configuration consistency status": "consistency_status", "vPC role": "role"}}
 	p.lines(text, false, v.line)
 	v.finish()

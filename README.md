@@ -6,6 +6,7 @@ Cisco NX-OS VXLAN/EVPN 配置与运行态采集、证据解析、Fabric 审查�
 
 ```sh
 GOWORK=off make check
+make check CHECK_EXTRA=project-quality
 GOWORK=off go build -mod=readonly -o bin/vxlan ./cmd/vxlan
 ./bin/vxlan --help
 ```

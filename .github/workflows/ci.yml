@@ -31,12 +31,16 @@ jobs:
           cache-dependency-path: go.sum
       - run: make check
   release-check:
-    timeout-minutes: 5
+    timeout-minutes: 20
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - run: python3 scripts/test-reuse-release.py
-      - run: python3 scripts/test-publish-release.py
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.27.x'
+          check-latest: true
+          cache-dependency-path: go.sum
+      - run: make check CHECK_EXTRA=project-quality
   package:
     needs: [verify, release-check]
     timeout-minutes: 15
@@ -54,11 +58,10 @@ jobs:
           go-version: '1.27.x'
           check-latest: true
           cache-dependency-path: go.sum
-      - run: sh scripts/package.sh
+      - run: make package
       - name: Verify release archives
         run: |
-          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' internal/cli/app.go)
-          sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
+          make verify-release REVISION="$GITHUB_SHA"
       - id: artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -96,6 +99,4 @@ jobs:
           unzip -q artifact.zip -d dist
       - name: Validate and execute the packaged binary
         run: |
-          version=$(sed -n 's/^const Version = "\([^"]*\)"$/\1/p' internal/cli/app.go)
-          sh scripts/verify-release.sh dist "v$version" "$GITHUB_SHA"
-          python3 scripts/package-smoke.py dist "v$version"
+          make package-smoke REVISION="$GITHUB_SHA"

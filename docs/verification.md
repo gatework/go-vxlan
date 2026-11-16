@@ -115,3 +115,9 @@ diff -qr "$vxlan_go/testdata" "$vxlan_oracle/testdata"
 Parser 运行态物理行、配置原文/摘要、来源五态和原 Ruby 金样继续验证。BGP 跨段冲突、数量下限、精确大整数、Port-channel 数字身份及配置关联边界有针对性回归。剩余 NVE peer 回显正文为空，配置不足以恢复实时邻居；保持 partial。
 
 上述为隔离候选本地证据；远程CI、同提交制品和正式附件须按 RELEASING.md 另行读回，不以离线回放代替新版实机、业务连通性或生产写入验收。
+
+## Makefile 与 go-standards v1.1.0
+
+参照 net-connector 将默认 CHECK_EXTRA 整理为 project-checks，并提供 project-quality。make check 完成共享标准、格式、lint、架构、race/shuffle、漏洞扫描，以及原模块/架构/独立交付门禁；make check CHECK_EXTRA=project-quality 在共享门禁后执行 actionlint v1.7.12 和两组发布脚本回归。两种入口均在本地通过。新版 exhaustive 门禁补齐四处已有枚举的显式分支，保留默认错误、复制和退出码语义。
+
+CI 的运行态与质量作业使用相同 Make 入口，打包、验包和两平台原生冒烟分别通过 make package、make verify-release 和 make package-smoke。standard.mk/.golangci.yml 由正式 stdsync v1.1.0 同步，无本地工具源替代。最终发布必须重新取得本轮提交的成功 main CI 制品，较早解析提交的成功 CI 不替代它。

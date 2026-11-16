@@ -155,6 +155,8 @@ func (a *App) collectionExit(result workflow.CollectionResult) int {
 		return 1
 	case workflow.CollectionInterrupted:
 		return 130
+	case workflow.CollectionUnknown, workflow.CollectionFailed:
+		return 2
 	default:
 		return 2
 	}

@@ -2,6 +2,8 @@
 
 ## v0.5.0
 
+- Align Makefile project/quality gates and packaging with net-connector; adopt go-standards v1.1.0.
+
 - Adopt the published net-connector v0.9.0 module path and go-netops v0.4.0.
 - Rename shared inventory platform filters, overrides and device-rule destinations to match Connector.
 - Share Parser content indexing across NX-OS configuration and runtime output; retain physical source lines and recognize complete empty L2route tables.

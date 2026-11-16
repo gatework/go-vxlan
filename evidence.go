@@ -97,6 +97,9 @@ func projectValue(v reflect.Value, active map[evidenceVisit]bool, depth int) (an
 		return documentNumber(json.Number(strconv.FormatUint(v.Uint(), 10))), nil
 	case reflect.Float32, reflect.Float64:
 		return projectFloat(v)
+	case reflect.Invalid, reflect.Uintptr, reflect.Complex64, reflect.Complex128,
+		reflect.Chan, reflect.Func, reflect.Interface, reflect.Pointer, reflect.Struct, reflect.UnsafePointer:
+		return nil, recordpkg.ErrEvidence
 	default:
 		return nil, recordpkg.ErrEvidence
 	}

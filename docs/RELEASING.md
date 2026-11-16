@@ -8,6 +8,9 @@
 4. 只有精确提交的 CI 全部成功才创建 vVERSION 标签。Release 作业只下载成功 main CI 的产物，不重新构建。
 5. 校验构建信息、提交、平台、许可证及摘要，先建立草稿，上传附件后逐字回读，再公开发布。重跑不会覆盖已有不同内容。
 
-本地准备：GOWORK=off GOFLAGS=-mod=readonly go test -race ./...；python3 scripts/test-reuse-release.py；python3 scripts/test-publish-release.py。
-干净提交打包：GOWORK=off sh scripts/package.sh；sh scripts/verify-release.sh dist vVERSION COMMIT。
+本地准备：GOWORK=off GOFLAGS=-mod=readonly go test -race ./...；make check CHECK_EXTRA=project-quality。
+干净提交打包：make package；make verify-release REVISION=COMMIT。
 私有设备数据、.env、.work 和本地二进制不纳入源码或发行包。源码中的示例与测试资料来源见 docs/verification.md。
+
+
+Makefile 参考 net-connector 的共享门禁结构，standard.mk 和 .golangci.yml 由正式 go-standards v1.1.0 的 stdsync 分发。默认 make check 经 CHECK_EXTRA=project-checks 执行模块、原架构回归和独立交付；make check CHECK_EXTRA=project-quality 增加 actionlint 与发布脚本回归。CI 使用同一入口，make package / make verify-release / make package-smoke 只准备、验证或执行制品冒烟，不会创建标签或发布附件。

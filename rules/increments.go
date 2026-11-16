@@ -49,6 +49,8 @@ func legacyRole(r fabric.Role) string {
 		return "leaves"
 	case fabric.RoleBorder:
 		return "borders"
+	case fabric.RoleSpine, fabric.RoleUnassigned:
+		return "spines"
 	default:
 		return "spines"
 	}

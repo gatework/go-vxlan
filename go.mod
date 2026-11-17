@@ -3,9 +3,9 @@ module github.com/gatework/go-vxlan
 go 1.26.0
 
 require (
-	github.com/gatework/go-expect v0.6.0
-	github.com/gatework/go-netops v0.4.0
-	github.com/gatework/net-connector v0.9.0
+	github.com/gatework/go-expect v0.6.2
+	github.com/gatework/go-netops v0.4.2
+	github.com/gatework/net-connector v0.9.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	go.yaml.in/yaml/v3 v3.0.6

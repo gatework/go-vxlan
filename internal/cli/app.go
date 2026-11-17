@@ -18,7 +18,7 @@ import (
 )
 
 // Version is the release version reported by the CLI.
-const Version = "0.5.0"
+const Version = "0.5.1"
 
 // App owns CLI streams, runtime dependencies and path resolution.
 type App struct {

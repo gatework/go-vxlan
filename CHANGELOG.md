@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.1
+
+- Upgrade published net-connector to v0.9.3, go-expect to v0.6.2 and go-netops to v0.4.2; retain Go 1.26.0 and the public API.
+- Align delivery dependency checks with the release pins.
+
 ## v0.5.0
 
 - Align Makefile project/quality gates and packaging with net-connector; adopt go-standards v1.1.0.
